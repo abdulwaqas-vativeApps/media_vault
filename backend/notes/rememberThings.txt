@@ -1,0 +1,5 @@
+proper error logs 
+swagger for api doc 
+unit testing
+joi and sanitization
+deployement on ec2
