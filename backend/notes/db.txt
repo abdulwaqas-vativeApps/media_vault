@@ -1,138 +1,48 @@
-generator client {
-  provider = "prisma-client-js"
+For Send Error :
+export class ApiError extends Error {
+  constructor(statusCode, message) {
+    super(message);
+    this.statusCode = statusCode;
+  }
 }
 
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
-
-//
-// ENUMS
-//
-
-enum auth_provider {
-  LOCAL
-  GOOGLE
-}
-
-enum user_status {
-  ACTIVE
-  INACTIVE
-}
-
-enum media_asset_type {
-  PROFILE_PICTURE
-  COMPANY_LOGO
-}
-
-enum role_name {
-  Admin
-  Member
-}
+For send response :
+export const SendResponse = (
+  res,
+  statusCode,
+  message,
+  data = null
+) => {
+ 
+  return res.status(statusCode).json({
+    success: true,
+    message,
+    data,
+  });
+};
 
 
-//
-// 1️⃣ USERS
-//
+Joi validate function : 
+import { ApiError } from "../utils/ApiError";
 
-model users {
-  id                 String        @id @default(uuid())
-  email              String        @unique
-  password           String?
-  provider           auth_provider
-  status             user_status   @default(ACTIVE)
-  role_id   String
+/**
+ * Middleware to validate request data using Joi schemas
+ * @param {Joi.Schema} schema - The Joi schema to validate against
+ * @param {string} property - The request property to validate (default: "body")
+ */
+export const ValidateSchema = (schema, property = "body") => {
+  return (req, res, next) => {
+    const joiRes = schema.validate(req[property]);
 
+    const { error } = joiRes;
 
-  created_at         DateTime      @default(now())
-  updated_at         DateTime      @updatedAt
+    if (error) {
+      return next(new ApiError(400, error.details[0].message));
+    }
 
-  role      roles  @relation(fields: [role_id], references: [id])
-
-  profile            profiles?
-  sessions           sessions[]
-  media_assets       media_assets[]
-}
-
-//
-// 2️⃣ ROLES
-//
-
-model roles {
-  id          String      @id @default(uuid())
-  name        role_name      @default(Member)
-
-  users  users[]
-}
-
-
-//
-// 4️⃣ PROFILES
-//
-
-model profiles {
-  id              String   @id @default(uuid())
-  user_id         String   @unique
-
-  full_name       String
-  designation     String?
-  contact_number  String?
-  connect_me_for  String?
-  company_name    String?
-
-  created_at      DateTime @default(now())
-  updated_at      DateTime @updatedAt
-
-  user           users    @relation(fields: [user_id], references: [id], onDelete: Cascade)
-
-  @@index([designation])
-  @@index([company_name])
-}
-
-//
-// 5️⃣ SESSIONS
-//
-
-model sessions {
-  id                  String   @id @default(uuid())
-  user_id             String
-
-  refresh_token       String
-  user_agent          String?
-  ip_address          String?
-  is_active           Boolean  @default(true)
-  expires_at          DateTime
-
-  created_at          DateTime @default(now())
-
-  user               users    @relation(fields: [user_id], references: [id], onDelete: Cascade)
-
-  @@index([user_id])
-  @@index([refresh_token])
-}
-
-//
-// 6️⃣ MEDIA_ASSETS
-//
-
-model media_assets {
-  id             String            @id @default(uuid())
-  user_id        String
-
-  asset_type     media_asset_type
-  s3_key         String
-  cdn_url        String
-  mime_type      String
-
-  is_active      Boolean           @default(true)
-  created_at     DateTime          @default(now())
-
-  user          users             @relation(fields: [user_id], references: [id], onDelete: Cascade)
-
-  @@index([user_id])
-  @@index([asset_type])
-}
+    next();
+  };
+};
 
 
 
@@ -153,7 +63,6 @@ media-vault-backend/
 │   │   ├── prisma.js
 │   │   ├── aws.js
 │   │   ├── env.js
-│   │   └── logger.js
 │   │
 │   ├── modules/
 │   │   ├── auth/
@@ -192,9 +101,7 @@ media-vault-backend/
 │   ├── middlewares/
 │   │   ├── auth.middleware.js
 │   │   ├── role.middleware.js
-│   │   ├── rateLimit.middleware.js
 │   │   ├── error.middleware.js
-│   │   ├── sanitize.middleware.js
 │   │   └── validate.middleware.js
 │   │
 │   ├── utils/
@@ -202,23 +109,20 @@ media-vault-backend/
 │   │   ├── ApiResponse.js
 │   │   ├── jwt.js
 │   │   ├── bcrypt.js
-│   │   └── pagination.js
+│   │   
 │   │
 │   ├── routes/
 │   │   └── index.js
 │   │
 │   └── constants/
 │       ├── roles.js
-│       ├── status.js
-│       └── cache.js
+│       
+│       
 │
 ├── prisma/
 │   ├── schema.prisma
-│   └── seed.js
-│
-├── tests/
-│   ├── unit/
-│   └── integration/
+│   
+│   
 │
 ├── .env
 ├── package.json

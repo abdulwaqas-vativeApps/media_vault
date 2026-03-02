@@ -1,0 +1,1208 @@
+prompt 1
+
+m media vault name ka aik project bna rha hun kis ka document ye h
+
+Project Document:
+Building on our MediaVault API structure, here are the pseudo-requirements for the User Directory & CDN system.
+In a professional environment like vativeApps, we categorize requirements into Functional (what the system does) and Technical/Infrastructure (how it’s built).
+1. Authentication & Identity
+Feature
+Pseudo-Requirement
+Social Auth
+Integrate Google OAuth 2.0. On successful login, check if the email exists in MySQL; if not, auto-create a user record.
+Standard Auth
+Allow signup/login via Email and Password. Passwords must be hashed using bcrypt before database storage.
+Session Mgmt
+Issue a JWT (JSON Web Token) upon successful authentication. Token should contain userId and role.
+Logout
+Invalidate the client-side token (clear cookie/local storage) and provide a server-side endpoint to log out.
+
+
+2. Profile Management
+After signing up, users are directed to a "Setup Profile" flow.
+Profile Data Fields:
+Personal: Full Name, Designation, Contact Number.
+Context: "Connect Me For" (Text area for expertise/interests).
+Assets: Profile Picture (User), Company Logo (Entity).
+Media Handling: * Files are uploaded to an S3 Bucket.
+The database stores the S3 Key (path) and the CDN URL.
+Edit Profile: Users can update all fields. If a new image is uploaded, the old one should be deleted from S3 to save costs.’
+
+3. CDN & Network Directory
+This is where the "Network Directory" becomes powerful by leveraging high-speed delivery.
+Global Delivery: All profile images and logos must be served via a CloudFront or Cloud CDN distribution.
+Requirements:
+The origin of the CDN is the S3 bucket.
+Implement Cache Invalidation: When a user updates their profile picture, the CDN cache for that specific URL must be cleared.
+Directory Search: A public/internal endpoint to fetch and filter all "Active" profiles.
+4. RBAC (Role-Based Access Control)
+Roles Defined:
+Member (Default):
+Can Manage own profile.
+Can view the Network Directory.
+Cannot access other users' private data.
+Admin:
+Has all Member permissions.
+Account Control: Can "Deactivate" (soft delete) or "Delete" (hard delete) any member account.
+Dashboard: Access to a list of all users with status toggles.
+5. Administrative Controls (Internal API)
+Deactivate: Sets a status flag in the MySQL user table to inactive. Inactive users cannot log in.
+Delete: 1. Delete all associated files from S3 (Profile pic, Logo).
+2. Remove user record from MySQL.
+3. Force-expire any active JWT sessions for that user.
+6. Infrastructure Checklist
+Storage: AWS S3 (Standard Storage Class).
+Delivery: AWS CloudFront (TTL: 24 Hours).
+Database: MySQL.
+Network: API hosted on an environment (like EC2 or App Engine) within the same region as S3 for low latency.
+
+1. Core Frontend Requirements
+A. Authentication & Onboarding
+Dual-Login Interface: A unified login page offering "Sign in with Google" (OAuth) and "Email/Password" forms.
+Auth State Management: Use Context API or Redux to store the user's JWT and profile status globally.
+Onboarding Wizard: A multi-step form for new users to set up their "Full Name," "Designation," and "Company Logo" immediately after their first login.
+B. Profile & Asset Management
+Smart Image Uploader: * Compression: Resize/compress images on the client side using libraries like browser-image-compression before sending them to the S3 service.
+Preview: Show instant previews of the "Profile Picture" and "Company Logo."
+Dynamic Profile Form: An "Edit Profile" page that pre-fills data from the MySQL backend. Use a "Save" state (loading spinner) to indicate S3/Database sync is in progress.
+2. RBAC & Protected UI (The "Gatekeeper")
+Security happens at the backend, but Visibility is managed at the frontend.
+Role
+Frontend Access
+All Users
+Access to Directory, View Profiles, Logout.
+Member
+Access to "My Profile" (Edit mode), Cannot see Admin Dashboard.
+Admin
+Access to "Admin Panel," View all users, Toggle "Deactivate/Delete" buttons.
+
+
+3. Network Directory (CDN Optimized)
+Lazy Loading: Use "Infinite Scroll" or pagination for the member directory to avoid loading 100+ images at once.
+CDN Integration: Ensure the image source (<img src={...}/>) points to the CloudFront/CDN URL, not the raw S3 bucket link, to ensure global speed.
+Search & Filter: A real-time search bar to filter members by "Designation" or "Company."
+4. Administrative Dashboard
+Member Management Table: A clean table showing:
+User Name | Role | Status (Active/Inactive) | Actions.
+Action Confirmation: Trigger a "Modal" for Deletion or Deactivation to prevent accidental clicks.
+Real-time Updates: After an Admin deactivates an account, the UI should update the user's row status immediately without a full page refresh.
+5. Technical Stack Suggestions
+Framework: React.js or Next.js (Preferred for SEO/Speed).
+Styling: Tailwind CSS or Material UI (For professional, company-grade aesthetics).
+Form Handling: react-hook-form and yup (for strict validation of "Contact" and "Designation" fields).
+HTTP Client: Axios with Interceptors to automatically attach the JWT to every request.
+
+
+Tech Stack we will use : postgre sql + prisma, express js
+
+Database Design :
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+//
+// ENUMS
+//
+
+enum auth_provider {
+  LOCAL
+  GOOGLE
+}
+
+enum user_status {
+  ACTIVE
+  INACTIVE
+}
+
+enum media_asset_type {
+  PROFILE_PICTURE
+  COMPANY_LOGO
+}
+
+enum role_name {
+  Admin
+  Member
+}
+
+
+//
+// 1️⃣ USERS
+//
+
+model users {
+  id                 String        @id @default(uuid())
+  email              String        @unique
+  password           String?
+  provider           auth_provider
+  status             user_status   @default(ACTIVE)
+  role_id   String
+
+
+  created_at         DateTime      @default(now())
+  updated_at         DateTime      @updatedAt
+
+  role      roles  @relation(fields: [role_id], references: [id])
+
+  profile            profiles?
+  sessions           sessions[]
+  media_assets       media_assets[]
+}
+
+//
+// 2️⃣ ROLES
+//
+
+model roles {
+  id          String      @id @default(uuid())
+  name        role_name      @default(Member)
+
+  users  users[]
+}
+
+
+//
+// 4️⃣ PROFILES
+//
+
+model profiles {
+  id              String   @id @default(uuid())
+  user_id         String   @unique
+
+  full_name       String
+  designation     String?
+  contact_number  String?
+  connect_me_for  String?
+  company_name    String?
+
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  user           users    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([designation])
+  @@index([company_name])
+}
+
+//
+// 5️⃣ SESSIONS
+//
+
+model sessions {
+  id                  String   @id @default(uuid())
+  user_id             String
+
+  refresh_token       String
+  user_agent          String?
+  ip_address          String?
+  is_active           Boolean  @default(true)
+  expires_at          DateTime
+
+  created_at          DateTime @default(now())
+
+  user               users    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([refresh_token])
+}
+
+//
+// 6️⃣ MEDIA_ASSETS
+//
+
+model media_assets {
+  id             String            @id @default(uuid())
+  user_id        String
+
+  asset_type     media_asset_type
+  s3_key         String
+  cdn_url        String
+  mime_type      String
+
+  is_active      Boolean           @default(true)
+  created_at     DateTime          @default(now())
+
+  user          users             @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([asset_type])
+}
+
+
+
+
+Folder Structure :
+media-vault-backend/
+│
+├── src/
+│   │
+│   ├── app.js
+│   ├── server.js
+│   │
+│   ├── config/
+│   │   ├── prisma.js
+│   │   ├── aws.js
+│   │   ├── env.js
+│   │   └── logger.js
+│   │
+│   ├── modules/
+│   │   ├── auth/
+│   │   │   ├── auth.controller.js
+│   │   │   ├── auth.service.js
+│   │   │   ├── auth.routes.js
+│   │   │   ├── auth.validation.js
+│   │   │   └── auth.constants.js
+│   │   │
+│   │   ├── user/
+│   │   │   ├── user.controller.js
+│   │   │   ├── user.service.js
+│   │   │   ├── user.routes.js
+│   │   │   ├── user.validation.js
+│   │   │   └── user.repository.js
+│   │   │
+│   │   ├── profile/
+│   │   │   ├── profile.controller.js
+│   │   │   ├── profile.service.js
+│   │   │   ├── profile.routes.js
+│   │   │   └── profile.validation.js
+│   │   │
+│   │   ├── media/
+│   │   │   ├── media.controller.js
+│   │   │   ├── media.service.js
+│   │   │   ├── media.routes.js
+│   │   │   ├── media.validation.js
+│   │   │   └── media.s3.js
+│   │   │
+│   │   ├── admin/
+│   │   │   ├── admin.controller.js
+│   │   │   ├── admin.service.js
+│   │   │   ├── admin.routes.js
+│   │   │   └── admin.validation.js
+│   │
+│   ├── middlewares/
+│   │   ├── auth.middleware.js
+│   │   ├── role.middleware.js
+│   │   ├── error.middleware.js
+│   │   └── validate.middleware.js
+│   │
+│   ├── utils/
+│   │   ├── ApiError.js
+│   │   ├── ApiResponse.js
+│   │   ├── jwt.js
+│   │   ├── bcrypt.js
+│   │   
+│   │
+│   ├── routes/
+│   │   └── index.js
+│   │
+│   └── constants/
+│       ├── roles.js
+│       
+│       
+│
+├── prisma/
+│   ├── schema.prisma
+│   
+│   
+│
+├── .env
+├── package.json
+└── README.md
+
+
+Api Contract Swagger :
+openapi: 3.0.1
+info:
+  title: MediaVault API
+  version: 1.0.4
+  description: "MediaVault API – Auth (signup, login, Google OAuth, logout, refresh token) & Profile management"
+
+servers:
+  - url: https://api.mediavault.com
+    description: Production server
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "uuid"
+        email:
+          type: string
+          example: "user@example.com"
+        role:
+          type: string
+          example: "Member"
+        status:
+          type: string
+          example: "ACTIVE"
+        profile:
+          type: object
+          properties:
+            full_name:
+              type: string
+              example: "John Doe"
+    Session:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "uuid"
+        user_id:
+          type: string
+          example: "uuid"
+        device_info:
+          type: string
+          example: "Chrome on Windows 11"
+        ip_address:
+          type: string
+          example: "192.168.1.10"
+        is_active:
+          type: boolean
+          example: true
+        expires_at:
+          type: string
+          format: date-time
+          example: "2025-12-01T10:00:00Z"
+        created_at:
+          type: string
+          format: date-time
+          example: "2025-11-28T10:00:00Z"          
+
+    MediaAsset:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "uuid"
+        asset_type:
+          type: string
+          example: "PROFILE_PICTURE"
+        s3_key:
+          type: string
+          example: "users/123/profile.jpg"
+        cdn_url:
+          type: string
+          example: "https://cdn.mediavault.com/users/123/profile.jpg"
+        mime_type:
+          type: string
+          example: "image/jpeg"
+        size_in_bytes:
+          type: integer
+          example: 102400
+        is_active:
+          type: boolean
+          example: true
+
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+          example: "Error message"
+
+paths:
+  # ---------- AUTH APIS ----------
+  /api/auth/signup:
+    post:
+      tags:
+        - Auth
+      summary: "Sign up via email/password"
+      description: "Create a new user account. Returns access token only (no refresh token)."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+                - full_name
+              properties:
+                email:
+                  type: string
+                  example: "user@example.com"
+                password:
+                  type: string
+                  example: "Password123!"
+                full_name:
+                  type: string
+                  example: "John Doe"
+      responses:
+        '201':
+          description: "User created successfully"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Signup successful"
+                  data:
+                    type: object
+                    properties:
+                      user:
+                        $ref: "#/components/schemas/User"
+                      accessToken:
+                        type: string
+                        example: "jwt_access_token"
+        '400':
+          description: "Validation failed"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        '409':
+          description: "Email already exists"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  message:
+                    type: string
+                    example: "Email already exists"
+
+  /api/auth/login:
+    post:
+      tags:
+        - Auth
+      summary: "Login via email/password"
+      description: "Returns JWT access token and refresh token (httpOnly cookie)"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  example: "user@example.com"
+                password:
+                  type: string
+                  example: "Password123!"
+      responses:
+        '200':
+          description: "Login successful"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Login successful"
+                  data:
+                    type: object
+                    properties:
+                      user:
+                        $ref: "#/components/schemas/User"
+                      accessToken:
+                        type: string
+                        example: "jwt_access_token"
+        '401':
+          description: "Invalid credentials"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/auth/google:
+    post:
+      tags:
+        - Auth
+      summary: "Login / Signup via Google OAuth"
+      description: "Authenticate user via Google OAuth, create account if not exists, return access token only"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - tokenId
+              properties:
+                tokenId:
+                  type: string
+                  example: "google_oauth_id_token"
+      responses:
+        '200':
+          description: "Google login successful"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Google login successful"
+                  data:
+                    type: object
+                    properties:
+                      user:
+                        $ref: "#/components/schemas/User"
+                      accessToken:
+                        type: string
+                        example: "jwt_access_token"
+        '400':
+          description: "Invalid Google token"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/auth/logout:
+    post:
+      tags:
+        - Auth
+      summary: "Logout user"
+      description: "Invalidate user session and clear refresh token (httpOnly cookie)"
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: "Logout successful"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Logout successful"
+        '401':
+          description: "Unauthorized / token invalid"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/auth/refresh-token:
+    post:
+      tags:
+        - Auth
+      summary: "Get new access token"
+      description: "Uses refresh token from httpOnly cookie to generate new access token (frontend does NOT send token)"
+      responses:
+        '200':
+          description: "New access token issued"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Access token refreshed"
+                  accessToken:
+                    type: string
+                    example: "new_jwt_access_token"
+        '401':
+          description: "Refresh token invalid or expired"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ---------- PROFILE APIS -----------
+   
+  /api/profile/me:
+    get:
+      tags:
+        - Profile
+      summary: "Get current logged-in user's profile with media assets"
+      description: "Fetches profile and media assets of the authenticated user"
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: "Profile fetched successfully"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Profile retrieved successfully"
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        example: "uuid"
+                      email:
+                        type: string
+                        example: "user@example.com"
+                      role:
+                        type: string
+                        example: "Member"
+                      status:
+                        type: string
+                        example: "ACTIVE"
+                      profile:
+                        type: object
+                        properties:
+                          full_name:
+                            type: string
+                            example: "John Doe"
+                          designation:
+                            type: string
+                            example: "Software Engineer"
+                          contact_number:
+                            type: string
+                            example: "+923001234567"
+                          connect_me_for:
+                            type: string
+                            example: "Collaboration on frontend projects"
+                          company_name:
+                            type: string
+                            example: "VativeApps"
+                      media_assets:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/MediaAsset"
+        '401':
+          description: "Unauthorized / invalid token"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+                
+
+  /api/profile:
+    put:
+      tags:
+        - Profile
+      summary: "Update current user's profile and media assets"
+      description: "Update personal, professional info and optionally media assets"
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                full_name:
+                  type: string
+                  example: "John Doe"
+                designation:
+                  type: string
+                  example: "Software Engineer"
+                contact_number:
+                  type: string
+                  example: "+923001234567"
+                connect_me_for:
+                  type: string
+                  example: "Collaboration on frontend projects"
+                company_name:
+                  type: string
+                  example: "VativeApps"
+                media_assets:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      asset_type:
+                        type: string
+                        example: "PROFILE_PICTURE"
+                      s3_key:
+                        type: string
+                        example: "users/123/profile_new.jpg"
+                      cdn_url:
+                        type: string
+                        example: "https://cdn.mediavault.com/users/123/profile_new.jpg"
+                      mime_type:
+                        type: string
+                        example: "image/jpeg"
+                      size_in_bytes:
+                        type: integer
+                        example: 102400
+                      is_active:
+                        type: boolean
+                        example: true
+      responses:
+        '200':
+          description: "Profile updated successfully"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Profile updated successfully"
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        example: "uuid"
+                      email:
+                        type: string
+                        example: "user@example.com"
+                      role:
+                        type: string
+                        example: "Member"
+                      status:
+                        type: string
+                        example: "ACTIVE"
+                      profile:
+                        type: object
+                        properties:
+                          full_name:
+                            type: string
+                            example: "John Doe"
+                          designation:
+                            type: string
+                            example: "Software Engineer"
+                          contact_number:
+                            type: string
+                            example: "+923001234567"
+                          connect_me_for:
+                            type: string
+                            example: "Collaboration on frontend projects"
+                          company_name:
+                            type: string
+                            example: "VativeApps"
+                      media_assets:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/MediaAsset"
+        '400':
+          description: "Validation error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        '401':
+          description: "Unauthorized / invalid token"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/profile/media-assets/presigned-url:
+    post:
+      tags:
+        - Profile
+      summary: "Get pre-signed URL for image upload"
+      description: "Generate a pre-signed URL for uploading a media asset (PROFILE_PICTURE or COMPANY_LOGO)."
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - asset_type
+                - file_name
+                - mime_type
+              properties:
+                asset_type:
+                  type: string
+                  description: "Type of the media asset"
+                  enum:
+                    - PROFILE_PICTURE
+                    - COMPANY_LOGO
+                  example: "PROFILE_PICTURE"
+                file_name:
+                  type: string
+                  description: "Name of the file to upload (including extension)"
+                  example: "profile.jpg"
+                mime_type:
+                  type: string
+                  description: "MIME type of the file"
+                  example: "image/jpeg"
+      responses:
+        '200':
+          description: "Pre-signed URL generated successfully"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Pre-signed URL generated successfully"
+                  data:
+                    type: object
+                    properties:
+                      uploadUrl:
+                        type: string
+                        example: "https://bucket-name.s3.amazonaws.com/users/123/profile.jpg?X-Amz-Signature=..."
+                      fileKey:
+                        type: string
+                        example: "users/123/profile.jpg"
+                      expiresIn:
+                        type: integer
+                        example: 3600
+        '400':
+          description: "Invalid input"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        '401':
+          description: "Unauthorized / invalid token"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"            
+
+  /api/network:
+    get:
+      tags:
+        - Network
+      summary: "Get paginated list of users for network"
+      description: "Fetch a paginated list of users with optional search (matches name, email, designation, or company). Supports `page` and `limit` query params."
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          description: "Page number (starts from 1)"
+          required: false
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          description: "Number of users per page"
+          required: false
+          schema:
+            type: integer
+            default: 20
+        - name: search
+          in: query
+          description: "Search by name, email, designation, or company"
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: "Paginated users fetched successfully"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Users retrieved successfully"
+                  data:
+                    type: object
+                    properties:
+                      total:
+                        type: integer
+                        example: 125
+                      page:
+                        type: integer
+                        example: 1
+                      limit:
+                        type: integer
+                        example: 20
+                      users:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                              example: "uuid"
+                            email:
+                              type: string
+                              example: "user@example.com"
+                            role:
+                              type: string
+                              example: "Member"
+                            status:
+                              type: string
+                              example: "ACTIVE"
+                            profile:
+                              type: object
+                              properties:
+                                full_name:
+                                  type: string
+                                  example: "John Doe"
+                                designation:
+                                  type: string
+                                  example: "Software Engineer"
+                                contact_number:
+                                  type: string
+                                  example: "+923001234567"
+                                connect_me_for:
+                                  type: string
+                                  example: "Collaboration on frontend projects"
+                                company_name:
+                                  type: string
+                                  example: "VativeApps"
+                            media_assets:
+                              type: array
+                              items:
+                                $ref: "#/components/schemas/MediaAsset"
+        '400':
+          description: "Invalid pagination parameters"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        '401':
+          description: "Unauthorized / invalid token"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    # ---------- ADMIN APIS ----------
+  /api/admin/users/{userId}/deactivate:
+    patch:
+      tags:
+        - Admin
+      summary: "Deactivate a user"
+      description: "Admin can deactivate a user account. Sets user status to INACTIVE."
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          description: "ID of the user to deactivate"
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: "User deactivated successfully"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "User deactivated successfully"
+        '401':
+          description: "Unauthorized / not admin"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        '404':
+          description: "User not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/admin/users/{userId}:
+    delete:
+      tags:
+        - Admin
+      summary: "Delete a user"
+      description: "Admin can delete a user account permanently."
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          description: "ID of the user to delete"
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: "User deleted successfully"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "User deleted successfully"
+        '401':
+          description: "Unauthorized / not admin"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        '404':
+          description: "User not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+   # ---------------- SESSION APIS ----------------
+
+  /api/sessions/user/{userId}:
+    get:
+      tags:
+        - Sessions
+      summary: "Get all sessions of a specific user"
+      description: "Admin can view all sessions (active & inactive) of a specific user."
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: "Sessions fetched successfully"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Session"
+        '401':
+          description: "Unauthorized / not admin"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/sessions/user/{userId}/{sessionId}/revoke:
+    patch:
+      tags:
+        - Sessions
+      summary: "Revoke a specific session"
+      description: "Admin can revoke a specific session of a user (logout from one device)."
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: "Session revoked successfully"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Session revoked successfully"
+        '404':
+          description: "Session not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/sessions/user/{userId}/revoke-all:
+    patch:
+      tags:
+        - Sessions
+      summary: "Revoke all sessions of a user"
+      description: "Admin can revoke all sessions of a user (logout from all devices)."
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: "All sessions revoked successfully"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "All sessions revoked successfully"
+        '404':
+          description: "User not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+ 
+
+

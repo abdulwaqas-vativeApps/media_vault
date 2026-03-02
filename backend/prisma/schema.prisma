@@ -1,0 +1,132 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+//
+// ENUMS
+//
+
+enum auth_provider {
+  Local
+  Google
+}
+
+enum user_status {
+  Active
+  Inactive
+}
+
+enum media_asset_type {
+  Profile_Picture
+  Company_Logo
+}
+
+enum role_name {
+  Admin
+  Member
+}
+
+//
+// 1️⃣ USERS
+//
+
+model users {
+  id       String        @id @default(uuid())
+  email    String        @unique
+  password String?
+  provider auth_provider
+  status   user_status   @default(Active)
+  role_id  String
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  role roles @relation(fields: [role_id], references: [id])
+
+  profile      profiles?
+  sessions     sessions[]
+  media_assets media_assets[]
+}
+
+//
+// 2️⃣ ROLES
+//
+
+model roles {
+  id   String    @id @default(uuid())
+  name role_name @default(Member)
+
+  users users[]
+}
+
+//
+// 4️⃣ PROFILES
+//
+
+model profiles {
+  id      String @id @default(uuid())
+  user_id String @unique
+
+  full_name      String
+  designation    String?
+  contact_number String?
+  connect_me_for String?
+  company_name   String?
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  user users @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([designation])
+  @@index([company_name])
+}
+
+//
+// 5️⃣ SESSIONS
+//
+
+model sessions {
+  id      String @id @default(uuid())
+  user_id String
+
+  refresh_token String
+  user_agent    String?
+  ip_address    String?
+  is_active     Boolean  @default(true)
+  expires_at    DateTime
+
+  created_at DateTime @default(now())
+
+  user users @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([refresh_token])
+}
+
+//
+// 6️⃣ MEDIA_ASSETS
+//
+
+model media_assets {
+  id      String @id @default(uuid())
+  user_id String
+
+  asset_type    media_asset_type
+  s3_key        String
+  cdn_url       String
+  mime_type     String
+  size_in_bytes Int?
+  is_active     Boolean          @default(true)
+  created_at    DateTime         @default(now())
+
+  user users @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([asset_type])
+}
