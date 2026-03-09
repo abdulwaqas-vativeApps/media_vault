@@ -1,5 +1,9 @@
+Output ==>
 proper error logs 
 swagger for api doc 
 unit testing
 joi and sanitization
+rate limitig
 deployement on ec2
+code speed
+code readibilty improve
