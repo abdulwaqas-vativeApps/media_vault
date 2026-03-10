@@ -59,7 +59,7 @@ model users {
 
 model roles {
   id   String    @id @default(uuid())
-  name role_name @default(Member)
+  name role_name @default(Member) @unique
 
   users users[]
 }

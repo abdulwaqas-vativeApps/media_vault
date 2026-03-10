@@ -19,7 +19,9 @@ async function main() {
 
 main()
   .catch((e) => {
+    console.error("===========================================");
     console.error(e);
+    console.error("===========================================");
     process.exit(1);
   })
   .finally(async () => {

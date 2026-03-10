@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "nodemon src/server.js"
+    "start": "nodemon src/server.js",
+    "seed": "prisma db seed"
   },
   "prisma": {
     "seed": "node prisma/seed.js"
@@ -24,6 +25,8 @@
     "joi": "^18.0.2",
     "jsonwebtoken": "^9.0.3",
     "prisma": "^6.19.2",
-    "uuid": "^13.0.0"
+    "swagger-ui-express": "^5.0.1",
+    "uuid": "^13.0.0",
+    "yamljs": "^0.3.0"
   }
 }
