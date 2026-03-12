@@ -7,12 +7,15 @@ import { ApiError } from "../utils/ApiError.js";
  */
 export const ValidateSchema = (schema, property = "body") => {
   return (req, res, next) => {
+    console.log(" validateSchema");
     const joiRes = schema.validate(req[property]);
 
     const { error } = joiRes;
 
+    console.log("error ===========>", error);
+
     if (error) {
-      return next(new ApiError(400, error.details[0].message));
+      throw new ApiError(400, error.details[0].message);
     }
 
     next();

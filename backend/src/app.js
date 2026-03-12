@@ -5,6 +5,8 @@ import routes from "./routes/index.js";
 import env from "./config/env.js";
 import swaggerUi from "swagger-ui-express";
 import YAML from "yamljs";
+import { ApiError } from "./utils/ApiError.js";
+import { GlobalErrorHandler } from "./middlewares/ErrorMiddleware.js";
 
 const app = express();
 
@@ -25,5 +27,11 @@ const swaggerDocument = YAML.load("./src/swagger/api-docs.yaml");
 app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
 app.use("/api", routes);
+
+app.use((req, res, next) => {
+  next(new ApiError(404, "Route not found"));
+});
+
+app.use(GlobalErrorHandler);
 
 export default app;

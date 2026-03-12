@@ -6,11 +6,15 @@ import { generateAccessToken, generateRefreshToken } from "../../utils/jwt.js";
 /**
  * Handles user signup logic
  */
-export const signupService = async ({ email, password, full_name , userAgent, ipAddress }) => {
-
-    console.log(" email, password, full_name , userAgent, ipAddress ");
-    console.log( email, password, full_name , userAgent, ipAddress );
-    
+export const signupService = async ({
+  email,
+  password,
+  full_name,
+  userAgent,
+  ipAddress,
+}) => {
+  console.log(" email, password, full_name , userAgent, ipAddress ");
+  console.log(email, password, full_name, userAgent, ipAddress);
 
   // Check if email already exists
   const existingUser = await prisma.users.findUnique({
