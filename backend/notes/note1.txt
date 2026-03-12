@@ -1,0 +1,393 @@
+=================================================================== 
+prompt 1 
+====================================================================
+
+m media vault name ka aik project bna rha hun kis ka document ye h
+
+Project Document:
+Building on our MediaVault API structure, here are the pseudo-requirements for the User Directory & CDN system.
+In a professional environment like vativeApps, we categorize requirements into Functional (what the system does) and Technical/Infrastructure (how it’s built).
+1. Authentication & Identity
+Feature
+Pseudo-Requirement
+Social Auth
+Integrate Google OAuth 2.0. On successful login, check if the email exists in MySQL; if not, auto-create a user record.
+Standard Auth
+Allow signup/login via Email and Password. Passwords must be hashed using bcrypt before database storage.
+Session Mgmt
+Issue a JWT (JSON Web Token) upon successful authentication. Token should contain userId and role.
+Logout
+Invalidate the client-side token (clear cookie/local storage) and provide a server-side endpoint to log out.
+
+
+2. Profile Management
+After signing up, users are directed to a "Setup Profile" flow.
+Profile Data Fields:
+Personal: Full Name, Designation, Contact Number.
+Context: "Connect Me For" (Text area for expertise/interests).
+Assets: Profile Picture (User), Company Logo (Entity).
+Media Handling: * Files are uploaded to an S3 Bucket.
+The database stores the S3 Key (path) and the CDN URL.
+Edit Profile: Users can update all fields. If a new image is uploaded, the old one should be deleted from S3 to save costs.’
+
+3. CDN & Network Directory
+This is where the "Network Directory" becomes powerful by leveraging high-speed delivery.
+Global Delivery: All profile images and logos must be served via a CloudFront or Cloud CDN distribution.
+Requirements:
+The origin of the CDN is the S3 bucket.
+Implement Cache Invalidation: When a user updates their profile picture, the CDN cache for that specific URL must be cleared.
+Directory Search: A public/internal endpoint to fetch and filter all "Active" profiles.
+4. RBAC (Role-Based Access Control)
+Roles Defined:
+Member (Default):
+Can Manage own profile.
+Can view the Network Directory.
+Cannot access other users' private data.
+Admin:
+Has all Member permissions.
+Account Control: Can "Deactivate" (soft delete) or "Delete" (hard delete) any member account.
+Dashboard: Access to a list of all users with status toggles.
+5. Administrative Controls (Internal API)
+Deactivate: Sets a status flag in the MySQL user table to inactive. Inactive users cannot log in.
+Delete: 1. Delete all associated files from S3 (Profile pic, Logo).
+2. Remove user record from MySQL.
+3. Force-expire any active JWT sessions for that user.
+6. Infrastructure Checklist
+Storage: AWS S3 (Standard Storage Class).
+Delivery: AWS CloudFront (TTL: 24 Hours).
+Database: MySQL.
+Network: API hosted on an environment (like EC2 or App Engine) within the same region as S3 for low latency.
+
+1. Core Frontend Requirements
+A. Authentication & Onboarding
+Dual-Login Interface: A unified login page offering "Sign in with Google" (OAuth) and "Email/Password" forms.
+Auth State Management: Use Context API or Redux to store the user's JWT and profile status globally.
+Onboarding Wizard: A multi-step form for new users to set up their "Full Name," "Designation," and "Company Logo" immediately after their first login.
+B. Profile & Asset Management
+Smart Image Uploader: * Compression: Resize/compress images on the client side using libraries like browser-image-compression before sending them to the S3 service.
+Preview: Show instant previews of the "Profile Picture" and "Company Logo."
+Dynamic Profile Form: An "Edit Profile" page that pre-fills data from the MySQL backend. Use a "Save" state (loading spinner) to indicate S3/Database sync is in progress.
+2. RBAC & Protected UI (The "Gatekeeper")
+Security happens at the backend, but Visibility is managed at the frontend.
+Role
+Frontend Access
+All Users
+Access to Directory, View Profiles, Logout.
+Member
+Access to "My Profile" (Edit mode), Cannot see Admin Dashboard.
+Admin
+Access to "Admin Panel," View all users, Toggle "Deactivate/Delete" buttons.
+
+
+3. Network Directory (CDN Optimized)
+Lazy Loading: Use "Infinite Scroll" or pagination for the member directory to avoid loading 100+ images at once.
+CDN Integration: Ensure the image source (<img src={...}/>) points to the CloudFront/CDN URL, not the raw S3 bucket link, to ensure global speed.
+Search & Filter: A real-time search bar to filter members by "Designation" or "Company."
+4. Administrative Dashboard
+Member Management Table: A clean table showing:
+User Name | Role | Status (Active/Inactive) | Actions.
+Action Confirmation: Trigger a "Modal" for Deletion or Deactivation to prevent accidental clicks.
+Real-time Updates: After an Admin deactivates an account, the UI should update the user's row status immediately without a full page refresh.
+5. Technical Stack Suggestions
+Framework: React.js or Next.js (Preferred for SEO/Speed).
+Styling: Tailwind CSS or Material UI (For professional, company-grade aesthetics).
+Form Handling: react-hook-form and yup (for strict validation of "Contact" and "Designation" fields).
+HTTP Client: Axios with Interceptors to automatically attach the JWT to every request.
+
+
+Tech Stack we will use : postgre sql + prisma, express js
+
+Database Design :
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+//
+// ENUMS
+//
+
+enum auth_provider {
+  LOCAL
+  GOOGLE
+}
+
+enum user_status {
+  ACTIVE
+  INACTIVE
+}
+
+enum media_asset_type {
+  PROFILE_PICTURE
+  COMPANY_LOGO
+}
+
+enum role_name {
+  Admin
+  Member
+}
+
+
+//
+// 1️⃣ USERS
+//
+
+model users {
+  id                 String        @id @default(uuid())
+  email              String        @unique
+  password           String?
+  provider           auth_provider
+  status             user_status   @default(ACTIVE)
+  role_id   String
+
+
+  created_at         DateTime      @default(now())
+  updated_at         DateTime      @updatedAt
+
+  role      roles  @relation(fields: [role_id], references: [id])
+
+  profile            profiles?
+  sessions           sessions[]
+  media_assets       media_assets[]
+}
+
+//
+// 2️⃣ ROLES
+//
+
+model roles {
+  id          String      @id @default(uuid())
+  name        role_name      @default(Member)
+
+  users  users[]
+}
+
+
+//
+// 4️⃣ PROFILES
+//
+
+model profiles {
+  id              String   @id @default(uuid())
+  user_id         String   @unique
+
+  full_name       String
+  designation     String?
+  contact_number  String?
+  connect_me_for  String?
+  company_name    String?
+
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  user           users    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([designation])
+  @@index([company_name])
+}
+
+//
+// 5️⃣ SESSIONS
+//
+
+model sessions {
+  id                  String   @id @default(uuid())
+  user_id             String
+
+  refresh_token       String
+  user_agent          String?
+  ip_address          String?
+  is_active           Boolean  @default(true)
+  expires_at          DateTime
+
+  created_at          DateTime @default(now())
+
+  user               users    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([refresh_token])
+}
+
+//
+// 6️⃣ MEDIA_ASSETS
+//
+
+model media_assets {
+  id             String            @id @default(uuid())
+  user_id        String
+
+  asset_type     media_asset_type
+  s3_key         String
+  cdn_url        String
+  mime_type      String
+
+  is_active      Boolean           @default(true)
+  created_at     DateTime          @default(now())
+
+  user          users             @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([asset_type])
+}
+
+
+
+
+Folder Structure :
+media-vault-backend/
+│
+├── src/
+│   │
+│   ├── app.js
+│   ├── server.js
+│   │
+│   ├── config/
+│   │   ├── prisma.js
+│   │   ├── aws.js
+│   │   ├── env.js
+│   │   └── logger.js
+│   │
+│   ├── modules/
+│   │   ├── auth/
+│   │   │   ├── auth.controller.js
+│   │   │   ├── auth.service.js
+│   │   │   ├── auth.routes.js
+│   │   │   ├── auth.validation.js
+│   │   │   └── auth.constants.js
+│   │   │
+│   │   ├── user/
+│   │   │   ├── user.controller.js
+│   │   │   ├── user.service.js
+│   │   │   ├── user.routes.js
+│   │   │   ├── user.validation.js
+│   │   │   └── user.repository.js
+│   │   │
+│   │   ├── profile/
+│   │   │   ├── profile.controller.js
+│   │   │   ├── profile.service.js
+│   │   │   ├── profile.routes.js
+│   │   │   └── profile.validation.js
+│   │   │
+│   │   ├── media/
+│   │   │   ├── media.controller.js
+│   │   │   ├── media.service.js
+│   │   │   ├── media.routes.js
+│   │   │   ├── media.validation.js
+│   │   │   └── media.s3.js
+│   │   │
+│   │   ├── admin/
+│   │   │   ├── admin.controller.js
+│   │   │   ├── admin.service.js
+│   │   │   ├── admin.routes.js
+│   │   │   └── admin.validation.js
+│   │
+│   ├── middlewares/
+│   │   ├── auth.middleware.js
+│   │   ├── role.middleware.js
+│   │   ├── error.middleware.js
+│   │   └── validate.middleware.js
+│   │
+│   ├── utils/
+│   │   ├── ApiError.js
+│   │   ├── ApiResponse.js
+│   │   ├── jwt.js
+│   │   ├── bcrypt.js
+│   │   
+│   │
+│   ├── routes/
+│   │   └── index.js
+│   │
+│   └── constants/
+│       ├── roles.js
+│       
+│       
+│
+├── prisma/
+│   ├── schema.prisma
+│   
+│   
+│
+├── .env
+├── package.json
+└── README.md
+
+
+Is trhn se kam krna h
+
+1) For Send Error :
+export class ApiError extends Error {
+  constructor(statusCode, message) {
+    super(message);
+    this.statusCode = statusCode;
+  }
+}
+
+2) For send response :
+export const SendResponse = (
+  res,
+  statusCode,
+  message,
+  data = null
+) => {
+ 
+  return res.status(statusCode).json({
+    success: true,
+    message,
+    data,
+  });
+};
+
+
+Our Joi validate function : 
+import { ApiError } from "../utils/ApiError";
+
+/**
+ * Middleware to validate request data using Joi schemas
+ */
+export const ValidateSchema = (schema, property = "body") => {
+  return (req, res, next) => {
+    const joiRes = schema.validate(req[property]);
+
+    const { error } = joiRes;
+
+    if (error) {
+      return next(new ApiError(400, error.details[0].message));
+    }
+
+    next();
+  };
+};
+
+
+3) For joi validation example 
+/**
+ * Joi schema to validate signup/login request body
+ */
+export const GoogleAuthSchema = Joi.object({
+  idToken: Joi.string().required().messages({
+    "string.empty": "Google idToken is required",
+    "any.required": "Google idToken is required",
+  }),
+});
+
+
+4) Funtion ka name PascalCase m likhna e.g GoogleAuthSchema , below structure ko follow krna 
+
+
+5) For import functions Follow this structure * as AuthController e.g for prevent dirt code
+import * as AuthService from "./AuthService.js"; 
+/**
+ * Signup controller
+ */
+export const SignupController = async (req, res, next) => {
+  try {
+    const { email, password, full_name } = req.body;
+
+    const result = await AuthService.SignupService({})
+
+
+6) aur file ka name PascalCase m rakhna AuthService.js etc 

@@ -3,6 +3,8 @@ import prisma from "../../config/prisma.js";
 import { ApiError } from "../../utils/ApiError.js";
 import { generateAccessToken, generateRefreshToken } from "../../utils/jwt.js";
 import { OAuth2Client } from "google-auth-library";
+import { Provider, UserStatus } from "../../constants/roles.js";
+import jwt from "jsonwebtoken";
 
 /**
  * Handles user signup logic
@@ -40,7 +42,7 @@ export const SignupService = async ({
     data: {
       email,
       password: hashedPassword,
-      provider: "Local",
+      provider: Provider.Local,
 
       role: {
         connect: { id: role.id },
@@ -58,28 +60,31 @@ export const SignupService = async ({
     },
   });
 
-  // Generate tokens
-  const accessToken = generateAccessToken({
-    userId: user.id,
-    role: user.role.name,
-  });
-
   const refreshToken = generateRefreshToken({
     userId: user.id,
   });
+
+  const hashedRefreshToken = await bcrypt.hash(refreshToken, 10);
 
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + 7);
 
   // create session with refresh token
-  await prisma.sessions.create({
+  const session = await prisma.sessions.create({
     data: {
       user_id: user.id,
-      refresh_token: refreshToken,
-      user_agent: userAgent,
-      ip_address: ipAddress,
+      refresh_token: hashedRefreshToken,
+      user_agent: userAgent || "unknown",
+      ip_address: ipAddress || "unknown",
       expires_at: expiresAt,
     },
+  });
+
+  // Generate tokens
+  const accessToken = generateAccessToken({
+    userId: user.id,
+    role: user.role.name,
+    sessionId: session.id,
   });
 
   return {
@@ -132,7 +137,7 @@ export const GoogleAuthService = async ({ idToken, userAgent, ipAddress }) => {
     user = await prisma.users.create({
       data: {
         email,
-        provider: "Google",
+        provider: Provider.Google,
 
         role: {
           connect: { id: role.id },
@@ -151,29 +156,31 @@ export const GoogleAuthService = async ({ idToken, userAgent, ipAddress }) => {
     });
   }
 
-  // Generate tokens
-  const accessToken = generateAccessToken({
-    userId: user.id,
-    role: user.role.name,
-  });
-
   const refreshToken = generateRefreshToken({
     userId: user.id,
   });
+
+  const hashedRefreshToken = await bcrypt.hash(refreshToken, 10);
 
   // Session expiry
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + 7);
 
   // Create session
-  await prisma.sessions.create({
+ const session = await prisma.sessions.create({
     data: {
       user_id: user.id,
-      refresh_token: refreshToken,
-      user_agent: userAgent,
-      ip_address: ipAddress,
+      refresh_token: hashedRefreshToken,
+      user_agent: userAgent || "unknown",
+      ip_address: ipAddress || "unknown",
       expires_at: expiresAt,
     },
+  });
+
+  const accessToken = generateAccessToken({
+    userId: user.id,
+    role: user.role.name,
+    sessionId: session.id,
   });
 
   return {
@@ -181,4 +188,115 @@ export const GoogleAuthService = async ({ idToken, userAgent, ipAddress }) => {
     accessToken,
     refreshToken,
   };
+};
+
+/**
+ * Login service
+ */
+export const LoginService = async ({
+  email,
+  password,
+  userAgent,
+  ipAddress,
+}) => {
+  // Check if user exists
+  const user = await prisma.users.findUnique({
+    where: { email },
+    include: {
+      role: true,
+      profile: true,
+    },
+  });
+
+  if (!user) {
+    throw new ApiError(401, "Invalid credentials");
+  }
+
+  // Ensure user registered via local provider
+  if (user.provider === "Google" && !user.password) {
+    throw new ApiError(400, "Please login using Google");
+  }
+
+  // Compare password
+  const isPasswordValid = await bcrypt.compare(password, user.password);
+
+  if (!isPasswordValid) {
+    throw new ApiError(401, "Invalid credentials");
+  }
+
+  const refreshToken = generateRefreshToken({
+    userId: user.id,
+  });
+
+    const hashedRefreshToken = await bcrypt.hash(refreshToken, 10);
+
+
+  // Refresh token expiry
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + 7);
+
+  // Create session
+ const session = await prisma.sessions.create({
+    data: {
+      user_id: user.id,
+      refresh_token: hashedRefreshToken,
+      user_agent: userAgent || "unknown",
+      ip_address: ipAddress || "unknown",
+      expires_at: expiresAt,
+    },
+  });
+
+  const accessToken = generateAccessToken({
+    userId: user.id,
+    role: user.role.name,
+    sessionId: session.id,
+  });
+
+  return {
+    user,
+    accessToken,
+    refreshToken,
+  };
+};
+
+/**
+ * RefreshToken Service
+ */
+export const RefreshTokenService = async ({ accessToken, refreshToken }) => {
+  //  Decode access token
+  let decoded = jwt.decode(accessToken);
+  if (!decoded?.sessionId) throw new ApiError("Invalid access token");
+
+  // find session in db
+  const session = await prisma.sessions.findUnique({
+    where: { id: decoded.sessionId },
+    include: { user: true },
+  });
+
+  if (!session) throw new ApiError(404, "Session not found");
+
+  //  Check session active & not expired
+  if (!session.is_active) throw new ApiError(403, "Session inactive");
+  if (new Date() > session.expires_at)
+    throw new ApiError(403, "Session expired");
+
+  //  Compare refresh token (hashed in DB)
+  const isTokenValid = await bcrypt.compare(
+    refreshToken,
+    session.refresh_token,
+  );
+  if (!isTokenValid) throw new ApiError(401, "Invalid refresh token");
+
+  //  Check user active
+  if (session.user.status !== UserStatus.Active)
+    throw new ApiError(403, "User inactive");
+
+  //  Generate new access token
+  const newAccessToken = generateAccessToken({
+    userId: session.user.id,
+    role: session.user.role.name,
+    sessionId: session.id,
+  });
+
+  return { accessToken: newAccessToken };
 };
