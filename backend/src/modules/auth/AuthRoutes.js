@@ -13,7 +13,7 @@ const router = express.Router();
 router.post(
   "/signup",
   ValidateSchema(AuthSchema.SignupSchema),
-  AuthController.SignupController
+  AuthController.SignupController,
 );
 
 /**
@@ -22,8 +22,8 @@ router.post(
 router.post(
   "/google",
   ValidateSchema(AuthSchema.GoogleAuthSchema),
-  AuthController.GoogleAuthController
-)
+  AuthController.GoogleAuthController,
+);
 
 /**
  * Login route
@@ -31,7 +31,12 @@ router.post(
 router.post(
   "/login",
   ValidateSchema(AuthSchema.LoginSchema),
-  AuthController.LoginController
+  AuthController.LoginController,
 );
+
+/**
+ * Get new access token using refresh token
+ */
+router.post("/refresh-token", AuthController.RefreshTokenController);
 
 export default router;

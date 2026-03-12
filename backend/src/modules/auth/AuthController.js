@@ -33,7 +33,7 @@ export const SignupController = async (req, res, next) => {
   }
 };
 
-/** 
+/**
  *  Google authentication controller
  */
 export const GoogleAuthController = async (req, res, next) => {
@@ -63,13 +63,11 @@ export const GoogleAuthController = async (req, res, next) => {
   }
 };
 
-
 /**
  * Login controller
  */
 export const LoginController = async (req, res, next) => {
   try {
-
     const { email, password } = req.body;
 
     const result = await AuthService.LoginService({
@@ -91,7 +89,37 @@ export const LoginController = async (req, res, next) => {
       user: result.user,
       accessToken: result.accessToken,
     });
+  } catch (error) {
+    next(error);
+  }
+};
 
+/**
+ * Refresh token controller
+ */
+export const RefreshTokenController = async (req, res, next) => {
+  try {
+    const accessToken = req.headers.authorization?.split(" ")[1];
+
+    if (!accessToken) throw new ApiError(401, "Access token is missing");
+
+    const refreshToken = req.cookies?.refreshToken;
+
+    if (!refreshToken) {
+      throw new ApiError(401, "Refresh token is missing");
+    }
+
+    const result = await AuthService.RefreshTokenService({
+      accessToken,
+      refreshToken,
+    });
+
+    return SendResponse(
+      res,
+      200,
+      "Access token refreshed successfully",
+      result,
+    );
   } catch (error) {
     next(error);
   }

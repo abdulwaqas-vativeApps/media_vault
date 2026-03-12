@@ -1,0 +1,19 @@
+Output ==>
+proper error logs 
+swagger for api doc 
+unit testing
+joi and sanitization
+rate limitig
+deployement on ec2
+code speed
+code readibilty improve
+
+
+ap /api/auth/refresh-token ki api k lien joi validation, route, controller , service bnaty hn
+
+logic :
+ye is lien h ager user koi api call kr rha h aur us ka accesstoken expire ho gia to frontend automatically ye api call kry ga refeashtoken k through new accesstoken milay ga aut wohi api dobra hit ho gye gi 
+ab is m logic ye hoga k fronted se accesstoken aur refeashtoken aye ga accesstoken ko decode kr use m session id ho us session ki base pr session find krna phir, us sesssion ki refeashtoken ko hash kr k compare kr fronted k refreatoken se aur ye chezen bhi check krna active h? expire to nhe hwa ? jis user ka refeashtoken token h wo db m h? wo user inactive to nhe h?
+
+aur kia refreash token is lien use hota h na 
+jis trhn industry ye kam hota us trhn krna
