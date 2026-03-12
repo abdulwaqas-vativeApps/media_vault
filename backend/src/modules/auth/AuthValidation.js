@@ -28,3 +28,13 @@ export const SignupSchema = Joi.object({
       "string.min": "Password should be at least 6 characters",
     }),
 });
+
+/**
+ * Joi schema to validate signup/login request body
+ */
+export const GoogleAuthSchema = Joi.object({
+  idToken: Joi.string().required().messages({
+    "string.empty": "Google idToken is required",
+    "any.required": "Google idToken is required",
+  }),
+});

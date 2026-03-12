@@ -2,20 +2,18 @@ import bcrypt from "bcryptjs";
 import prisma from "../../config/prisma.js";
 import { ApiError } from "../../utils/ApiError.js";
 import { generateAccessToken, generateRefreshToken } from "../../utils/jwt.js";
+import { OAuth2Client } from "google-auth-library";
 
 /**
  * Handles user signup logic
  */
-export const signupService = async ({
+export const SignupService = async ({
   email,
   password,
   full_name,
   userAgent,
   ipAddress,
 }) => {
-  console.log(" email, password, full_name , userAgent, ipAddress ");
-  console.log(email, password, full_name, userAgent, ipAddress);
-
   // Check if email already exists
   const existingUser = await prisma.users.findUnique({
     where: { email },
@@ -74,6 +72,100 @@ export const signupService = async ({
   expiresAt.setDate(expiresAt.getDate() + 7);
 
   // create session with refresh token
+  await prisma.sessions.create({
+    data: {
+      user_id: user.id,
+      refresh_token: refreshToken,
+      user_agent: userAgent,
+      ip_address: ipAddress,
+      expires_at: expiresAt,
+    },
+  });
+
+  return {
+    user,
+    accessToken,
+    refreshToken,
+  };
+};
+
+/**
+ * Handles Google authentication logic
+ */
+export const GoogleAuthService = async ({ idToken, userAgent, ipAddress }) => {
+  const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+
+  // Verify google token
+  const ticket = await googleClient.verifyIdToken({
+    idToken,
+    audience: process.env.GOOGLE_CLIENT_ID,
+  });
+
+  const payload = ticket.getPayload();
+
+  const { email, name } = payload;
+
+  if (!email) {
+    throw new ApiError(400, "Google account email not found");
+  }
+
+  // Check if user already exists
+  let user = await prisma.users.findUnique({
+    where: { email },
+    include: {
+      role: true,
+      profile: true,
+    },
+  });
+
+  // If user does not exist → create user
+  if (!user) {
+    // Get default role
+    const role = await prisma.roles.findUnique({
+      where: { name: "Member" },
+    });
+
+    if (!role) {
+      throw new ApiError(500, "Default role not found");
+    }
+
+    user = await prisma.users.create({
+      data: {
+        email,
+        provider: "Google",
+
+        role: {
+          connect: { id: role.id },
+        },
+
+        profile: {
+          create: {
+            full_name: name || "Google User",
+          },
+        },
+      },
+      include: {
+        role: true,
+        profile: true,
+      },
+    });
+  }
+
+  // Generate tokens
+  const accessToken = generateAccessToken({
+    userId: user.id,
+    role: user.role.name,
+  });
+
+  const refreshToken = generateRefreshToken({
+    userId: user.id,
+  });
+
+  // Session expiry
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + 7);
+
+  // Create session
   await prisma.sessions.create({
     data: {
       user_id: user.id,
