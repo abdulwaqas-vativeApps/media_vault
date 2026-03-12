@@ -3,6 +3,7 @@ import prisma from "../../config/prisma.js";
 import { ApiError } from "../../utils/ApiError.js";
 import { generateAccessToken, generateRefreshToken } from "../../utils/jwt.js";
 import { OAuth2Client } from "google-auth-library";
+import { Provider } from "../../constants/roles.js";
 
 /**
  * Handles user signup logic
@@ -40,7 +41,7 @@ export const SignupService = async ({
     data: {
       email,
       password: hashedPassword,
-      provider: "Local",
+      provider: Provider.Local,
 
       role: {
         connect: { id: role.id },
@@ -76,8 +77,8 @@ export const SignupService = async ({
     data: {
       user_id: user.id,
       refresh_token: refreshToken,
-      user_agent: userAgent,
-      ip_address: ipAddress,
+      user_agent: userAgent || "unknown",
+      ip_address: ipAddress || "unknown",
       expires_at: expiresAt,
     },
   });
@@ -132,7 +133,7 @@ export const GoogleAuthService = async ({ idToken, userAgent, ipAddress }) => {
     user = await prisma.users.create({
       data: {
         email,
-        provider: "Google",
+        provider: Provider.Google,
 
         role: {
           connect: { id: role.id },
@@ -170,8 +171,71 @@ export const GoogleAuthService = async ({ idToken, userAgent, ipAddress }) => {
     data: {
       user_id: user.id,
       refresh_token: refreshToken,
-      user_agent: userAgent,
-      ip_address: ipAddress,
+      user_agent: userAgent || "unknown",
+      ip_address: ipAddress || "unknown",
+      expires_at: expiresAt,
+    },
+  });
+
+  return {
+    user,
+    accessToken,
+    refreshToken,
+  };
+};
+
+
+/**
+ * Login service
+ */
+export const LoginService = async ({ email, password, userAgent, ipAddress }) => {
+
+  // Check if user exists
+  const user = await prisma.users.findUnique({
+    where: { email },
+    include: {
+      role: true,
+      profile: true,
+    },
+  });
+
+  if (!user) {
+    throw new ApiError(401, "Invalid credentials");
+  }
+
+  // Ensure user registered via local provider
+  if (user.provider === "Google" && !user.password) {
+    throw new ApiError(400, "Please login using Google");
+  }
+
+  // Compare password
+  const isPasswordValid = await bcrypt.compare(password, user.password);
+
+  if (!isPasswordValid) {
+    throw new ApiError(401, "Invalid credentials");
+  }
+
+  // Generate tokens
+  const accessToken = generateAccessToken({
+    userId: user.id,
+    role: user.role.name,
+  });
+
+  const refreshToken = generateRefreshToken({
+    userId: user.id,
+  });
+
+  // Refresh token expiry
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + 7);
+
+  // Create session
+  await prisma.sessions.create({
+    data: {
+      user_id: user.id,
+      refresh_token: refreshToken,
+      user_agent: userAgent || "unknown",
+      ip_address: ipAddress || "unknown",
       expires_at: expiresAt,
     },
   });

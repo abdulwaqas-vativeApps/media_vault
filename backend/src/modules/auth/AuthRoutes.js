@@ -25,4 +25,13 @@ router.post(
   AuthController.GoogleAuthController
 )
 
+/**
+ * Login route
+ */
+router.post(
+  "/login",
+  ValidateSchema(AuthSchema.LoginSchema),
+  AuthController.LoginController
+);
+
 export default router;

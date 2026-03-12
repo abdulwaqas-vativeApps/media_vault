@@ -62,3 +62,37 @@ export const GoogleAuthController = async (req, res, next) => {
     next(error);
   }
 };
+
+
+/**
+ * Login controller
+ */
+export const LoginController = async (req, res, next) => {
+  try {
+
+    const { email, password } = req.body;
+
+    const result = await AuthService.LoginService({
+      email,
+      password,
+      userAgent: req.headers["user-agent"],
+      ipAddress: req.ip,
+    });
+
+    // Store refresh token in httpOnly cookie
+    res.cookie("refreshToken", result.refreshToken, {
+      httpOnly: true,
+      secure: false,
+      sameSite: "strict",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    return SendResponse(res, 200, "Login successful", {
+      user: result.user,
+      accessToken: result.accessToken,
+    });
+
+  } catch (error) {
+    next(error);
+  }
+};

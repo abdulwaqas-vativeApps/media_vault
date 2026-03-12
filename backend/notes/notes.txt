@@ -1,4 +1,4 @@
-For Send Error :
+1) For Send Error :
 export class ApiError extends Error {
   constructor(statusCode, message) {
     super(message);
@@ -6,7 +6,7 @@ export class ApiError extends Error {
   }
 }
 
-For send response :
+2) For send response :
 export const SendResponse = (
   res,
   statusCode,
@@ -22,13 +22,11 @@ export const SendResponse = (
 };
 
 
-Joi validate function : 
+Our Joi validate function : 
 import { ApiError } from "../utils/ApiError";
 
 /**
  * Middleware to validate request data using Joi schemas
- * @param {Joi.Schema} schema - The Joi schema to validate against
- * @param {string} property - The request property to validate (default: "body")
  */
 export const ValidateSchema = (schema, property = "body") => {
   return (req, res, next) => {
@@ -45,9 +43,34 @@ export const ValidateSchema = (schema, property = "body") => {
 };
 
 
+3) For joi validation example 
+/**
+ * Joi schema to validate signup/login request body
+ */
+export const GoogleAuthSchema = Joi.object({
+  idToken: Joi.string().required().messages({
+    "string.empty": "Google idToken is required",
+    "any.required": "Google idToken is required",
+  }),
+});
 
 
+4) Funtion ka name PascalCase m likhna e.g GoogleAuthSchema , below structure ko follow krna 
 
+
+5) For import functions Follow this structure * as AuthController e.g for prevent dirt code
+import * as AuthService from "./AuthService.js"; 
+/**
+ * Signup controller
+ */
+export const SignupController = async (req, res, next) => {
+  try {
+    const { email, password, full_name } = req.body;
+
+    const result = await AuthService.SignupService({})
+
+
+6) aur file ka name PascalCase m rakhna AuthService.js etc 
 
 
 

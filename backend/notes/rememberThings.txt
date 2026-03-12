@@ -9,43 +9,8 @@ code speed
 code readibilty improve
 
 
+ap login ki api k lien joi validation, route, controller , service bnaty hn
 
+logic :
 
-import jwt from 'jsonwebtoken';
-import { OAuth2Client } from 'google-auth-library';
-import prisma from '../config/prisma.js';
-import { ROLES } from '../constants/roles.js';
-import { generateAccessToken } from '../utils/jwt.js';
-
-const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
-
-export const googleLogin = async (idToken) => { 
-
-
-  const ticket = await googleClient.verifyIdToken({
-    idToken,
-    audience: process.env.GOOGLE_CLIENT_ID
-  });
-
-
-
-  const { email } = ticket.getPayload();
-
-  let user = await prisma.user.findUnique({
-    where: { email }
-  });
-
-  if (!user) {
-    user = await prisma.user.create({
-      data: {
-        
-        email,
-        role: ROLES.MEMBER
-      }
-    });
-  }
-
-  const token = generateAccessToken(user);
-
-  return { user, token };
-};
+email,password recive hoga, bcryptjs hor passowrd hash ager invalid crendital so pass error if correct so create session,accesstoken,refeashtoken
