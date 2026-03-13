@@ -3,7 +3,7 @@ import prisma from "../../config/prisma.js";
 import { ApiError } from "../../utils/ApiError.js";
 import { generateAccessToken, generateRefreshToken } from "../../utils/jwt.js";
 import { OAuth2Client } from "google-auth-library";
-import { Provider, UserStatus } from "../../constants/roles.js";
+import { Provider, ROLES, UserStatus } from "../../constants/constants.js";
 import jwt from "jsonwebtoken";
 
 /**
@@ -30,7 +30,7 @@ export const SignupService = async ({
 
   // Get default role (Member)
   const role = await prisma.roles.findUnique({
-    where: { name: "Member" },
+    where: { name: ROLES.Member },
   });
 
   if (!role) {
@@ -127,7 +127,7 @@ export const GoogleAuthService = async ({ idToken, userAgent, ipAddress }) => {
   if (!user) {
     // Get default role
     const role = await prisma.roles.findUnique({
-      where: { name: "Member" },
+      where: { name: ROLES.Member },
     });
 
     if (!role) {
@@ -167,7 +167,7 @@ export const GoogleAuthService = async ({ idToken, userAgent, ipAddress }) => {
   expiresAt.setDate(expiresAt.getDate() + 7);
 
   // Create session
- const session = await prisma.sessions.create({
+  const session = await prisma.sessions.create({
     data: {
       user_id: user.id,
       refresh_token: hashedRefreshToken,
@@ -228,15 +228,14 @@ export const LoginService = async ({
     userId: user.id,
   });
 
-    const hashedRefreshToken = await bcrypt.hash(refreshToken, 10);
-
+  const hashedRefreshToken = await bcrypt.hash(refreshToken, 10);
 
   // Refresh token expiry
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + 7);
 
   // Create session
- const session = await prisma.sessions.create({
+  const session = await prisma.sessions.create({
     data: {
       user_id: user.id,
       refresh_token: hashedRefreshToken,
@@ -267,10 +266,18 @@ export const RefreshTokenService = async ({ accessToken, refreshToken }) => {
   let decoded = jwt.decode(accessToken);
   if (!decoded?.sessionId) throw new ApiError("Invalid access token");
 
+  console.log("Decoded access token: ", decoded);
+
   // find session in db
   const session = await prisma.sessions.findUnique({
     where: { id: decoded.sessionId },
-    include: { user: true },
+    include: {
+      user: {
+        include: {
+          role: true,
+        },
+      },
+    },
   });
 
   if (!session) throw new ApiError(404, "Session not found");
@@ -299,4 +306,33 @@ export const RefreshTokenService = async ({ accessToken, refreshToken }) => {
   });
 
   return { accessToken: newAccessToken };
+};
+
+
+/**
+ * LogoutService
+ */
+export const LogoutService = async ({ sessionId }) => {
+
+  const session = await prisma.sessions.findUnique({
+    where: { id: sessionId },
+  });
+
+  if (!session) {
+    throw new ApiError(404, "Session not found");
+  }
+
+  if (!session.is_active) {
+    throw new ApiError(400, "Session already logged out");
+  }
+
+  // deactivate session
+  await prisma.sessions.update({
+    where: { id: sessionId },
+    data: {
+      is_active: false,
+    },
+  });
+
+  return true;
 };
