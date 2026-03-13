@@ -9,12 +9,7 @@ code speed
 code readibilty improve
 
 
-ap /api/auth/logout ki api k lien joi validation (if needed), route, controller , service bnaty hn
+ap /api/sessions/user/{userId} ki api k lien joi validation (if needed), route, controller , service bnaty hn
 
 logic :
-req.user ye session id mil gye gi us ki base pr us session ko is_active false kr dena, aur bhi kuch validate krna hoto kr lena, industry m jis trhn kam hota h usi trhn krna.
-
-req.user m ye chezen milen gi  
-    userId: user.id,
-    role: user.role.name,
-    sessionId: session.id,
+ye user id ki base pr sessions table m se sary sesssion find kr k send kr dena, jis trhn industry m kam hota h usi trhn kam krna

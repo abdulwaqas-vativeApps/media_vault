@@ -3,6 +3,7 @@ import { SendResponse } from "../utils/ApiResponse.js";
 
 // Import module-specific routers 
 import authRoutes from "../modules/auth/AuthRoutes.js";
+import sessionRoutes from "../modules/session/SessionRoutes.js";
 
 
 const router = Router();
@@ -13,7 +14,8 @@ router.get("/health", (req, res) => {
 });
 
 // Module Routers
-router.use("/auth", authRoutes);      // /api/auth/* routes
+router.use("/auth", authRoutes);
+router.use("/sessions", sessionRoutes);
 
 
 export default router;
