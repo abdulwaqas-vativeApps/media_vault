@@ -121,6 +121,23 @@ export const RefreshTokenController = async (req, res, next) => {
       result,
     );
   } catch (error) {
+    console.error("Error in RefreshTokenController: ", error);
+    next(error);
+  }
+};
+
+/**
+ * Logout controller
+ */
+export const LogoutController = async (req, res, next) => {
+  try {
+    const { sessionId } = req.user;
+
+    await AuthService.LogoutService({ sessionId });
+
+    return SendResponse(res, 200, "Logged out successfully");
+  } catch (error) {
+    console.error("Error in LogoutController: ", error);
     next(error);
   }
 };

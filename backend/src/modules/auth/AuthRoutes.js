@@ -2,6 +2,7 @@ import express from "express";
 import * as AuthController from "./AuthController.js";
 import * as AuthSchema from "./AuthValidation.js";
 import { ValidateSchema } from "../../middlewares/ValidateMiddleware.js";
+import { AuthMiddleware } from "../../middlewares/AuthMiddleware.js";
 
 const router = express.Router();
 
@@ -38,5 +39,14 @@ router.post(
  * Get new access token using refresh token
  */
 router.post("/refresh-token", AuthController.RefreshTokenController);
+
+/**
+ * Logout route
+ */
+router.post(
+  "/logout",
+  AuthMiddleware,
+  AuthController.LogoutController
+);
 
 export default router;
