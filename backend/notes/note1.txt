@@ -374,8 +374,15 @@ export const GoogleAuthSchema = Joi.object({
   }),
 });
 
+And call in routes file like this 
 
-4) Funtion ka name PascalCase m likhna e.g GoogleAuthSchema , below structure ko follow krna 
+4)router.post(
+  "/google",
+  ValidateSchema(AuthSchema.GoogleAuthSchema),
+  AuthController.GoogleAuthController,
+);
+
+
 
 
 5) For import functions Follow this structure * as AuthController e.g for prevent dirt code
@@ -389,5 +396,13 @@ export const SignupController = async (req, res, next) => {
 
     const result = await AuthService.SignupService({})
 
+6) Funtion ka name PascalCase m likhna e.g GoogleAuthSchema and also file ka name PascalCase m rakhna AuthService.js etc 
 
-6) aur file ka name PascalCase m rakhna AuthService.js etc 
+7) well commeted code likhna and donot use emojis in code 
+
+mere instructions/rules ko strictly follow krna
+
+Work we have done yet :
+auth module done
+session module start
+all session get api done

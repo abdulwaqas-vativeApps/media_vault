@@ -15,7 +15,7 @@ router.get("/health", (req, res) => {
 
 // Module Routers
 router.use("/auth", authRoutes);
-router.use("/sessions", sessionRoutes);
+router.use("/session", sessionRoutes);
 
 
 export default router;

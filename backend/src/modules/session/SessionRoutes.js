@@ -18,4 +18,14 @@ router.get(
   SessionController.GetUserSessionsController,
 );
 
+/**
+ * Revoke a specific session of a user
+ */
+router.patch(
+  "/user/:userId/:sessionId/revoke",
+  AuthMiddleware,
+  ValidateSchema(SessionsSchema.RevokeSessionSchema, "params"),
+  SessionController.RevokeSessionController
+);
+
 export default router;

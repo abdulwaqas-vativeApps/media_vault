@@ -19,3 +19,33 @@ export const GetUserSessionsService = async ({ userId }) => {
 
   return sessions;
 };
+
+/**
+ * Revoke specific session of a user
+ */
+export const RevokeSessionService = async ({ userId, sessionId }) => {
+  const session = await prisma.sessions.findUnique({
+    where: { id: sessionId },
+  });
+
+  if (!session || session.user_id !== userId) {
+    throw new ApiError(404, "Session not found");
+  }
+
+  if (!session.is_active) {
+    throw new ApiError(400, "Session is already inactive");
+  }
+
+  if (new Date() > session.expires_at) {
+    throw new ApiError(400, "Session is already expired");
+  }
+
+  await prisma.sessions.update({
+    where: { id: sessionId },
+    data: {
+      is_active: false,
+    },
+  });
+
+  return true;
+};

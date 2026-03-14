@@ -9,7 +9,14 @@ code speed
 code readibilty improve
 
 
-ap /api/sessions/user/{userId} ki api k lien joi validation (if needed), route, controller , service bnaty hn
+Goal : revoke specific session of user 
+
+Api : /api/sessions/user/{userId}/{sessionId}/revoke
+
 
 logic :
-ye user id ki base pr sessions table m se sary sesssion find kr k send kr dena, jis trhn industry m kam hota h usi trhn kam krna
+user_id aur sessionid ki base pr session find kr k revoke krna aur validation bhi krna jis jis ki need ho
+e.g session already inactive ya exprie to nhe etc, jis trhn baki kam hwa wa h usi structure ko follow krty hway ka kam
+jis trhn industry m kam hota h usi trhn kam krna
+
+write joi validation (if needed), route, controller , service for this api

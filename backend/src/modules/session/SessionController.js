@@ -17,3 +17,21 @@ export const GetUserSessionsController = async (req, res, next) => {
     next(error);
   }
 };
+
+/**
+ * Controller to revoke a specific session
+ */
+export const RevokeSessionController = async (req, res, next) => {
+  try {
+    const { userId, sessionId } = req.params;
+
+    await SessionService.RevokeSessionService({
+      userId,
+      sessionId,
+    });
+
+    return SendResponse(res, 200, "Session revoked successfully");
+  } catch (error) {
+    next(error);
+  }
+};
