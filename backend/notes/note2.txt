@@ -9,12 +9,14 @@ code speed
 code readibilty improve
 
 
-ap /api/auth/logout ki api k lien joi validation (if needed), route, controller , service bnaty hn
+Goal : revoke all session of user 
+
+Api : /api/sessions/user/{userId}/revoke-all
+
 
 logic :
-req.user ye session id mil gye gi us ki base pr us session ko is_active false kr dena, aur bhi kuch validate krna hoto kr lena, industry m jis trhn kam hota h usi trhn krna.
+user_id ki base pr session find kr k revoke krna aur validation bhi krna jis jis ki need ho
+jis trhn baki kam hwa wa h usi structure ko follow krty hway ka kam
+jis trhn industry m kam hota h usi trhn kam krna
 
-req.user m ye chezen milen gi  
-    userId: user.id,
-    role: user.role.name,
-    sessionId: session.id,
+write joi validation (if needed), route, controller , service for this api
