@@ -28,4 +28,14 @@ router.patch(
   SessionController.RevokeSessionController
 );
 
+/**
+ * Revoke all sessions of a user
+ */
+router.patch(
+  "/user/:userId/revoke-all",
+  AuthMiddleware,
+  ValidateSchema(SessionsSchema.RevokeAllSessionsSchema, "params"),
+  SessionController.RevokeAllSessionsController
+);
+
 export default router;

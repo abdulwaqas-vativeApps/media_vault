@@ -49,3 +49,42 @@ export const RevokeSessionService = async ({ userId, sessionId }) => {
 
   return true;
 };
+
+/**
+ * Revoke all sessions of a user
+ */
+export const RevokeAllSessionsService = async ({ userId }) => {
+  const user = await prisma.users.findUnique({
+    where: { id: userId },
+  });
+
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+
+  const activeSessions = await prisma.sessions.findMany({
+    where: {
+      user_id: userId,
+      is_active: true,
+      expires_at: {
+        gt: new Date(),
+      },
+    },
+  });
+
+  if (!activeSessions || activeSessions.length === 0) {
+    throw new ApiError(400, "No active sessions found for this user");
+  }
+
+  await prisma.sessions.updateMany({
+    where: {
+      user_id: userId,
+      is_active: true,
+    },
+    data: {
+      is_active: false,
+    },
+  });
+
+  return true;
+};

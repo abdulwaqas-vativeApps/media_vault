@@ -35,3 +35,20 @@ export const RevokeSessionController = async (req, res, next) => {
     next(error);
   }
 };
+
+/**
+ * Controller to revoke all sessions of a user
+ */
+export const RevokeAllSessionsController = async (req, res, next) => {
+  try {
+    const { userId } = req.params;
+
+    await SessionService.RevokeAllSessionsService({
+      userId,
+    });
+
+    return SendResponse(res, 200, "All sessions revoked successfully");
+  } catch (error) {
+    next(error);
+  }
+};

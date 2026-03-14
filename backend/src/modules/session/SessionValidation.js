@@ -20,3 +20,12 @@ export const RevokeSessionSchema = Joi.object({
     "any.required": "Session id is required",
   }),
 });
+
+/**
+ * Validate userId param for revoking all sessions
+ */
+export const RevokeAllSessionsSchema = Joi.object({
+  userId: Joi.string().required().messages({
+    "any.required": "User id is required",
+  }),
+});
