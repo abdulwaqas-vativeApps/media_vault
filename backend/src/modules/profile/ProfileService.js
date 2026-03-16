@@ -171,3 +171,36 @@ export const UpdateProfileService = async ({
 
   return updatedUser;
 };
+
+
+
+/**
+ * Service: Fetch user profile by userId
+ * Includes profile, media assets, and role
+ * 
+ * @param {string} userId
+ * @returns {object} user data
+ */
+export const GetMyProfileService = async (userId) => {
+  try {
+    const user = await prisma.users.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        provider: true,
+        profile: true,
+        media_assets: true,
+        role: true,
+      },
+    });
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    return user;
+  } catch (error) {
+    throw error; // Let controller handle error
+  }
+};

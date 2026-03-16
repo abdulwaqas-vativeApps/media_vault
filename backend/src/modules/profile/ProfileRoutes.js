@@ -46,4 +46,9 @@ router.post(
   ProfileController.PresignedUrlController
 );
 
+/**
+ * Get My Profile
+ */
+router.get("/me", AuthMiddleware, ProfileController.GetMyProfileController);
+
 export default router;

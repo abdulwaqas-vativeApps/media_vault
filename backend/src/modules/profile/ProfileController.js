@@ -79,3 +79,30 @@ export const UpdateProfileController = async (req, res, next) => {
     next(error);
   }
 };
+
+
+/**
+ * Controller: Get currently logged-in user's profile
+ * 
+ * @param req.user.userId -> retrieved from AuthMiddleware
+ * @returns user data including profile and media_assets
+ */
+export const GetMyProfileController = async (req, res, next) => {
+  try {
+    const userId = req.user.userId;
+
+    // Guard clause: Ensure userId exists
+    if (!userId) {
+      return next(new ApiError(400, "Invalid user session"));
+    }
+
+    // Call service to fetch user data
+    const userData = await ProfileService.GetMyProfileService(userId);
+
+    // Send successful response
+    return SendResponse(res, 200, "User profile fetched successfully", userData);
+  } catch (error) {
+    console.log("GetMyProfileController", error);
+    next(error); // Pass error to global error handler
+  }
+};
