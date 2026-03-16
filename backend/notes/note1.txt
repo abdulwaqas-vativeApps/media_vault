@@ -398,11 +398,66 @@ export const SignupController = async (req, res, next) => {
 
 6) Funtion ka name PascalCase m likhna e.g GoogleAuthSchema and also file ka name PascalCase m rakhna AuthService.js etc 
 
-7) well commeted code likhna and donot use emojis in code 
+7) well commeted code likhna, specially complex logic pr code ko achy se comment krna and donot use emojis in code 
 
 mere instructions/rules ko strictly follow krna
 
 Work we have done yet :
-auth module done
-session module start
-all session get api done
+
+
+
+
+
+
+
+===============================================
+//  prompt 2
+===============================================
+"
+Api : PUT /api/profile
+Goal : Update current user's profile and media assets
+
+
+logic :
+user_id ki base pr session find kr k revoke krna aur validation bhi krna jis jis ki need ho
+jis trhn baki kam hwa wa h usi structure ko follow krty hway ka kam
+jis trhn industry m kam hota h usi trhn kam krna
+
+write joi validation (if needed), route, controller , service for this api"
+convert this prompt into english
+
+
+
+
+===============================================
+//  prompt 3
+===============================================
+"
+GET
+/api/profile/me
+Goal :Get current logged-in user's profile with media assets
+
+
+logic :
+
+now make a api for gey user data on the bases of req.user.userId
+aur is trhn ka data return krna 
+e.g
+ select: {
+      id: true,
+      email: true,
+      provider: true,
+      profile: true,
+      media_assets: true,
+      role: true
+    },
+
+write joi validation (if needed), route, controller , service and also give me dummy data to this api in postman for this api
+
+instructions:
+well commeted code likhna, specially compplex login pr code ko achy se comment krna, and donot use emojis in code 
+file ka name aur function ka name PascalCase m rakhna 
+jis trhn baki kam hwa wa h usi structure ko follow krty hway ka kam
+jis trhn industry m kam hota h usi trhn kam krna
+"
+convert this prompt into english

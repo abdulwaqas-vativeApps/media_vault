@@ -9,14 +9,6 @@ code speed
 code readibilty improve
 
 
-Goal : revoke all session of user 
+Understands :-
 
-Api : /api/sessions/user/{userId}/revoke-all
-
-
-logic :
-user_id ki base pr session find kr k revoke krna aur validation bhi krna jis jis ki need ho
-jis trhn baki kam hwa wa h usi structure ko follow krty hway ka kam
-jis trhn industry m kam hota h usi trhn kam krna
-
-write joi validation (if needed), route, controller , service for this api
+1.In profile route presigned conditional logic 

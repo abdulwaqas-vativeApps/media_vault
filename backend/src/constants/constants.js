@@ -12,3 +12,8 @@ export const UserStatus = {
   Active: "Active",
   Inactive: "Inactive"
 };
+
+export const ImageType = {
+   Profile_Picture: "Profile_Picture",
+  Company_Logo: "Company_Logo"
+}
