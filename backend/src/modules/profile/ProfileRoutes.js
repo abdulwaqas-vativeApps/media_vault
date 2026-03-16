@@ -26,6 +26,16 @@ const conditionalValidation = (req, res, next) => {
 };
 
 /**
+ * Update User Profile
+ */
+router.put(
+  "/",
+  AuthMiddleware,
+  ValidateSchema(ProfileValidation.UpdateProfileSchema),
+  ProfileController.UpdateProfileController
+);
+
+/**
  * Get Presigned URL for media assets
  */
 router.post(

@@ -410,12 +410,14 @@ all session get api done
 
 
 
+
+
 ===============================================
 //  prompt 2
 ===============================================
-"Goal : revoke all session of user 
-
-Api : /api/sessions/user/{userId}/revoke-all
+"
+Api : PUT /api/profile
+Goal : Update current user's profile and media assets
 
 
 logic :
@@ -424,4 +426,58 @@ jis trhn baki kam hwa wa h usi structure ko follow krty hway ka kam
 jis trhn industry m kam hota h usi trhn kam krna
 
 write joi validation (if needed), route, controller , service for this api"
+convert this prompt into english
+
+
+
+
+===============================================
+//  prompt 3
+===============================================
+"
+Api : PUT /api/profile
+Goal : Update current user's profile and media assets
+
+
+logic :
+ab user update krny k lien api banao humen frontend is trhn ka data recive hoga
+{
+  "full_name": "John Doe",
+  "designation": "Software Engineer",
+  "contact_number": "+923001234567",
+  "connect_me_for": "Collaboration on frontend projects",
+  "company_name": "VativeApps",
+  "password": "password123",
+  "media_assets": [
+    {
+      "asset_type": "PROFILE_PICTURE",
+      "s3_key": "users/123/profile_new.jpg",
+      "cdn_url": "https://cdn.mediavault.com/users/123/profile_new.jpg",
+      "mime_type": "image/jpeg",
+      "size_in_bytes": 102400,
+      "is_active": true
+    },
+      {
+      "asset_type": "Company_Logo",
+      "s3_key": "users/123/profile_new.jpg",
+      "cdn_url": "https://cdn.mediavault.com/users/123/profile_new.jpg",
+      "mime_type": "image/jpeg",
+      "size_in_bytes": 102400,
+      "is_active": true
+    }
+  ]
+}
+
+aur ager user ka provider Google hoto password bhi aya ga phir us ka hash kr k save krna h,
+user ki media asssts ko check bhi krna h ager us user ki already koi media assest ho Profile_Picture ya Company_Logo ki to srif use specific asset ko s3 se delete aur cdn se bhi remove krna h, ager nhe hoto bus new add kr dena h jo recive hogi
+
+
+write joi validation (if needed), route, controller , service and also give me dummy data to this api in postman for this api
+
+instructions:
+well commeted code likhna, specially compplex login pr code ko achy se comment krna, and donot use emojis in code 
+file ka name aur function ka name PascalCase m rakhna 
+jis trhn baki kam hwa wa h usi structure ko follow krty hway ka kam
+jis trhn industry m kam hota h usi trhn kam krna
+"
 convert this prompt into english

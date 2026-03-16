@@ -45,3 +45,37 @@ export const PresignedUrlController = async (req, res, next) => {
   }
 
 };
+
+/**
+ * Update Profile Controller
+ */
+export const UpdateProfileController = async (req, res, next) => {
+  try {
+
+
+    const {
+      full_name,
+      designation,
+      contact_number,
+      connect_me_for,
+      company_name,
+      password,
+      media_assets
+    } = req.body;
+
+    const result = await ProfileService.UpdateProfileService({
+      userId: req.user.userId,
+      full_name,
+      designation,
+      contact_number,
+      connect_me_for,
+      company_name,
+      password,
+      media_assets,
+    });
+
+    return SendResponse(res, 200, "Profile updated successfully", result);
+  } catch (error) {
+    next(error);
+  }
+};
