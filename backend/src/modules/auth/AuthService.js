@@ -30,7 +30,7 @@ export const SignupService = async ({
 
   // Get default role (Member)
   const role = await prisma.roles.findUnique({
-    where: { name: ROLES.Member },
+    where: { name: ROLES.Admin },
   });
 
   if (!role) {

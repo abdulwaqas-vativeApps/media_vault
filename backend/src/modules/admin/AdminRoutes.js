@@ -17,7 +17,7 @@ const router = express.Router();
 router.patch(
   "/users/:userId/deactivate",
   AuthMiddleware,
-  RoleMiddleware([ROLES.Admin]),
+  RoleMiddleware(ROLES.Admin),
   ValidateSchema(AdminSchemaValidation.UserStatusSchema, "params"), // validate userId param
   AdminController.ToggleUserStatusController
 );

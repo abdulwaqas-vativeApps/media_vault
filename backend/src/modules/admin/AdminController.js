@@ -1,6 +1,5 @@
-import * as AdminService from "./admin.service.js";
+import * as AdminService from "./AdminService.js";
 import { SendResponse } from "../../utils/ApiResponse.js";
-import { ApiError } from "../../utils/ApiError.js";
 
 /**
  * Controller: Toggle user status (ACTIVE <-> INACTIVE)

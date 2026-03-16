@@ -1,4 +1,4 @@
-import { prisma } from "../../config/prisma.js";
+import prisma from "../../config/prisma.js";
 import { ApiError } from "../../utils/ApiError.js";
 import { UserStatus } from "../../constants/constants.js";
 
