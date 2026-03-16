@@ -1,6 +1,6 @@
 Output ==>
 proper error logs 
-swagger for api doc 
+swagger for api doc ✅
 unit testing
 joi and sanitization
 rate limitig
@@ -12,3 +12,4 @@ code readibilty improve
 Understands :-
 
 1.In profile route presigned conditional logic 
+2.cahe invalid cdn, s3 delete understand and also fix chahe invalid cdn

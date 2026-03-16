@@ -433,17 +433,18 @@ convert this prompt into english
 //  prompt 3
 ===============================================
 
-PATCH
-/api/admin/users/{userId}/deactivate
-Goal : Deactivate a user
+DELETE
+/api/admin/users/{userId}
+Goal : Permenantly Delete a user
 
 
 logic :
 
-now make make a api to toggole user status inactive to active and active to inactive
-when the admin set user status active to inactive so revoke all the sessions of that user
-and when inactive so only change status and donot do any thing 
-only admin can change user status
+now make make a api to remove user form data base 
+also delete its data from profile table
+and also revoke all session of that user
+and also delete media_assets of that user form s3 and also clear cdn invalide if media_assets exists for that user 
+only admin can delete user
 
 write joi validation (if needed), route, controller , service and also give me dummy data to this api in postman for this api
 
