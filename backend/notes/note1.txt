@@ -432,25 +432,18 @@ convert this prompt into english
 ===============================================
 //  prompt 3
 ===============================================
-"
-GET
-/api/profile/me
-Goal :Get current logged-in user's profile with media assets
+
+PATCH
+/api/admin/users/{userId}/deactivate
+Goal : Deactivate a user
 
 
 logic :
 
-now make a api for gey user data on the bases of req.user.userId
-aur is trhn ka data return krna 
-e.g
- select: {
-      id: true,
-      email: true,
-      provider: true,
-      profile: true,
-      media_assets: true,
-      role: true
-    },
+now make make a api to toggole user status inactive to active and active to inactive
+when the admin set user status active to inactive so revoke all the sessions of that user
+and when inactive so only change status and donot do any thing 
+only admin can change user status
 
 write joi validation (if needed), route, controller , service and also give me dummy data to this api in postman for this api
 
@@ -459,5 +452,4 @@ well commeted code likhna, specially compplex login pr code ko achy se comment k
 file ka name aur function ka name PascalCase m rakhna 
 jis trhn baki kam hwa wa h usi structure ko follow krty hway ka kam
 jis trhn industry m kam hota h usi trhn kam krna
-"
-convert this prompt into english
+

@@ -106,8 +106,9 @@ export const UpdateProfileService = async ({
           asset_type: asset.asset_type,
         },
       });
-
+      console.log("run yes");
       if (existingAsset) {
+        console.log("run no");
         // Delete from S3
         if (existingAsset.s3_key) {
           try {
