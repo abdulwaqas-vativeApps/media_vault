@@ -6,7 +6,7 @@ import { useEffect } from 'react';
 export default function Login() {
 
   // for attach google sign in button to div#googleBtn, we need to wait for google script to load
-  useEffect(() => {
+  useEffect(() => { 
     /* global google */
     if (window.google) {
       google.accounts.id.initialize({
@@ -51,7 +51,7 @@ export default function Login() {
       formData.append("image", file); // 👈 IMPORTANT
       formData.append("mime_type", file.type);
       formData.append("file_name", file.name);
-      formData.append("asset_type", "profile_pic");
+      formData.append("asset_type", "Profile_Picture");
 
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_BACKEND_URL}/profile/media-assets/presigned-url`,
@@ -69,8 +69,8 @@ export default function Login() {
       console.log('=============upload url==============');
 
       //  PUT request → DIRECT S3
-      if (data.uploadUrl) {
-        await fetch(data.uploadUrl, {
+      if (data.data.uploadUrl) {
+        await fetch(data.data.uploadUrl, {
           method: "PUT",
           headers: {
             "Content-Type": file.type

@@ -7,6 +7,7 @@ import { UploadMiddleware, UploadMemoryMiddleware } from "../../middlewares/Uplo
 
 const router = express.Router();
 
+// Conditional upload middleware
 const conditionalUpload = (req, res, next) => {
   if (process.env.USE_CDN === "false") {
     return UploadMiddleware.single("image")(req, res, next);
@@ -15,6 +16,7 @@ const conditionalUpload = (req, res, next) => {
   return UploadMemoryMiddleware.single("image")(req, res, next);
 };
 
+// Conditional validation middleware
 const conditionalValidation = (req, res, next) => {
   if (process.env.USE_CDN !== "false") {
     return ValidateSchema(ProfileValidation.PresignedUrlSchema)(req, res, next);
@@ -23,6 +25,9 @@ const conditionalValidation = (req, res, next) => {
   next();
 };
 
+/**
+ * Get Presigned URL for media assets
+ */
 router.post(
   "/media-assets/presigned-url",
   // AuthMiddleware,
