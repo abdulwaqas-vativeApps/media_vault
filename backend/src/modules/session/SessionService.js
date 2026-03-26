@@ -1,5 +1,6 @@
 import prisma from "../../config/prisma.js";
 import { ApiError } from "../../utils/ApiError.js";
+import { ExpireUserSessions } from "../../utils/SessionUtils.js";
 
 /**
  * Get all sessions of a user
@@ -76,15 +77,7 @@ export const RevokeAllSessionsService = async ({ userId }) => {
     throw new ApiError(400, "No active sessions found for this user");
   }
 
-  await prisma.sessions.updateMany({
-    where: {
-      user_id: userId,
-      is_active: true,
-    },
-    data: {
-      is_active: false,
-    },
-  });
+  await ExpireUserSessions(userId);
 
   return true;
 };

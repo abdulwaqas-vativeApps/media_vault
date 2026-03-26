@@ -19,7 +19,19 @@ router.patch(
   AuthMiddleware,
   RoleMiddleware(ROLES.Admin),
   ValidateSchema(AdminSchemaValidation.UserStatusSchema, "params"), // validate userId param
-  AdminController.ToggleUserStatusController
+  AdminController.ToggleUserStatusController,
 );
 
+/**
+ * @route   DELETE /api/admin/users/:userId
+ * @desc    Permanently delete a user and all associated data
+ * @access  Admin only
+ */
+router.delete(
+  "/users/:userId",
+  AuthMiddleware,
+  RoleMiddleware(ROLES.Admin),
+  ValidateSchema(AdminSchemaValidation.UserStatusSchema, "params"), // validate userId param
+  AdminController.DeleteUserController,
+);
 export default router;

@@ -1,11 +1,11 @@
 import { PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
-import { CreateInvalidationCommand } from "@aws-sdk/client-cloudfront";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { ImageType, Provider } from "../../constants/constants.js";
 import { ApiError } from "../../utils/ApiError.js";
 import { s3, cloudFront } from "../../config/Aws.js";
 import prisma from "../../config/prisma.js";
 import bcrypt from "bcryptjs";
+import { DeleteFromS3, InvalidateCloudFront } from "../../utils/AwsUtils.js";
 
 /**
  * Generate presigned URL Service for media assets
@@ -67,7 +67,7 @@ export const UpdateProfileService = async ({
 
   // 2. Update password if provided
   if (existingUser.provider === Provider.Google && !password) {
-    throw new ApiError(400, "Password is required for Google users");
+    throw new ApiError(400, "Password is required for Google signing users");
   } else if (existingUser.provider === Provider.Google && password) {
     const hashedPassword = await bcrypt.hash(password, 10);
     await prisma.users.update({
@@ -111,31 +111,12 @@ export const UpdateProfileService = async ({
         console.log("run no");
         // Delete from S3
         if (existingAsset.s3_key) {
-          try {
-            const deleteCmd = new DeleteObjectCommand({
-              Bucket: process.env.S3_BUCKET_NAME,
-              Key: existingAsset.s3_key,
-            });
-            await s3.send(deleteCmd);
 
-            // Invalidate CloudFront if distribution ID exists
-            if (process.env.CLOUDFRONT_DISTRIBUTION_ID) {
-              const invalidationCmd = new CreateInvalidationCommand({
-                DistributionId: process.env.CLOUDFRONT_DISTRIBUTION_ID,
-                InvalidationBatch: {
-                  CallerReference: Date.now().toString(),
-                  Paths: {
-                    Quantity: 1,
-                    Items: [`/${existingAsset.s3_key}`],
-                  },
-                },
-              });
-              await cloudFront.send(invalidationCmd);
-            }
-          } catch (err) {
-            console.error("Failed to delete from S3/CDN:", err);
-            // Optionally log and continue without throwing so DB continues updating
-          }
+          // delete file from S3
+          await DeleteFromS3(existingAsset.s3_key);
+
+          // Invalidate CloudFront if distribution ID exists
+          await InvalidateCloudFront(existingAsset.s3_key);
         }
 
         // Delete from DB
@@ -151,7 +132,7 @@ export const UpdateProfileService = async ({
           asset_type: asset.asset_type,
           s3_key: asset.s3_key,
           cdn_url: asset.cdn_url,
-          mime_type: asset.mime_type
+          mime_type: asset.mime_type,
         },
       });
     }
@@ -164,21 +145,20 @@ export const UpdateProfileService = async ({
       id: true,
       email: true,
       provider: true,
+      status: true,
       profile: true,
       media_assets: true,
-      role: true
+      role: true,
     },
   });
 
   return updatedUser;
 };
 
-
-
 /**
  * Service: Fetch user profile by userId
  * Includes profile, media assets, and role
- * 
+ *
  * @param {string} userId
  * @returns {object} user data
  */
@@ -190,6 +170,7 @@ export const GetMyProfileService = async (userId) => {
         id: true,
         email: true,
         provider: true,
+        status: true,
         profile: true,
         media_assets: true,
         role: true,

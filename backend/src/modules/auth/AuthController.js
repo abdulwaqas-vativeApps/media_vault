@@ -1,3 +1,4 @@
+import { ApiError } from "../../utils/ApiError.js";
 import { SendResponse } from "../../utils/ApiResponse.js";
 import * as AuthService from "./AuthService.js";
 

@@ -1,50 +1,86 @@
 import prisma from "../../config/prisma.js";
 import { ApiError } from "../../utils/ApiError.js";
 import { UserStatus } from "../../constants/constants.js";
+import { ExpireUserSessions } from "../../utils/SessionUtils.js";
 
 /**
  * Service: Toggle user status
  */
 export const ToggleUserStatusService = async (userId) => {
-    // Fetch current user status
-    const user = await prisma.users.findUnique({ where: { id: userId } });
+  // Fetch current user status
+  const user = await prisma.users.findUnique({ where: { id: userId } });
 
-    if (!user) {
-        throw new ApiError(404, "User not found");
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+
+  let updatedStatus;
+
+  if (user.status === UserStatus.Active) {
+    //  If currently ACTIVE, set to INACTIVE and revoke all sessions
+    updatedStatus = UserStatus.Inactive;
+
+    await prisma.users.update({
+      where: { id: userId },
+      data: { status: updatedStatus },
+    });
+
+    // Revoke all sessions of this user
+    await ExpireUserSessions(userId);
+
+  } else {
+    //  If currently INACTIVE, set to ACTIVE (no session revocation needed)
+    updatedStatus = UserStatus.Active;
+
+    await prisma.users.update({
+      where: { id: userId },
+      data: { status: updatedStatus },
+    });
+  }
+
+  //  Return updated status
+  return { userId, status: updatedStatus };
+};
+
+/**
+ * Service: Delete a user permanently
+ * - Delete all media assets from S3 and clear CDN
+ * - Delete profile
+ * - Delete sessions
+ * - Delete user
+ *
+ * @param {string} userId
+ */
+export const DeleteUserService = async (userId) => {
+  // / Fetch user to ensure existence
+  const user = await prisma.users.findUnique({
+    where: { id: userId },
+    include: { media_assets: true },
+  });
+
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+
+    // / Delete all media assets from S3 & clear CDN
+    if (user.media_assets && user.media_assets.length > 0) {
+      for (const media of user.media_assets) {
+        //elete file from S3
+        await S3Service.DeleteObject(media.s3_key);
+
+        //lear CDN cache for the media URL (if using CloudFront invalidation)
+        await S3Service.InvalidateCdnCache(media.cdn_url);
+      }
     }
 
-    let updatedStatus;
+    //  Revoke all active sessions
+    await ExpireUserSessions(userId);
 
-    if (user.status === UserStatus.Active) {
-        //  If currently ACTIVE, set to INACTIVE and revoke all sessions
-        updatedStatus = UserStatus.Inactive;
+  // Delete profile (cascade deletion handled via Prisma relation)
+  // Delete user
+  await prisma.users.delete({
+    where: { id: userId },
+  });
 
-        await prisma.users.update({
-            where: { id: userId },
-            data: { status: updatedStatus },
-        });
-
-        // Revoke all sessions of this user
-        await prisma.sessions.updateMany({
-            where: {
-                user_id: userId,
-                is_active: true,
-            },
-            data: {
-                is_active: false,
-            },
-        });
-
-    } else {
-        //  If currently INACTIVE, set to ACTIVE (no session revocation needed)
-        updatedStatus = UserStatus.Active;
-
-        await prisma.users.update({
-            where: { id: userId },
-            data: { status: updatedStatus },
-        });
-    }
-
-    //  Return updated status
-    return { userId, status: updatedStatus };
+  return;
 };
