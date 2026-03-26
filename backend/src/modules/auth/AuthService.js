@@ -30,7 +30,7 @@ export const SignupService = async ({
 
   // Get default role (Member)
   const role = await prisma.roles.findUnique({
-    where: { name: ROLES.Member },
+    where: { name: ROLES.Admin },
   });
 
   if (!role) {
@@ -156,6 +156,10 @@ export const GoogleAuthService = async ({ idToken, userAgent, ipAddress }) => {
     });
   }
 
+  if (user && user.status === UserStatus.Inactive) {
+    throw new ApiError(404,"Your account is Inactive")
+  }
+
   const refreshToken = generateRefreshToken({
     userId: user.id,
   });
@@ -207,6 +211,10 @@ export const LoginService = async ({
       profile: true,
     },
   });
+
+  if (user && user.status === UserStatus.Inactive) {
+    throw new ApiError(404,"Your account is Inactive")
+  }
 
   if (!user) {
     throw new ApiError(401, "Invalid credentials");

@@ -5,6 +5,7 @@ import { SendResponse } from "../utils/ApiResponse.js";
 import authRoutes from "../modules/auth/AuthRoutes.js";
 import sessionRoutes from "../modules/session/SessionRoutes.js";
 import profileRoutes from "../modules/profile/ProfileRoutes.js";
+import adminRoutes from "../modules/admin/AdminRoutes.js"; 
 
 const router = Router();
 
@@ -17,5 +18,6 @@ router.get("/health", (req, res) => {
 router.use("/auth", authRoutes);
 router.use("/session", sessionRoutes);
 router.use("/profile", profileRoutes);
+router.use("/admin", adminRoutes);
 
 export default router;
