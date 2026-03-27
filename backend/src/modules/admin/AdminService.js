@@ -2,6 +2,7 @@ import prisma from "../../config/prisma.js";
 import { ApiError } from "../../utils/ApiError.js";
 import { UserStatus } from "../../constants/constants.js";
 import { ExpireUserSessions } from "../../utils/SessionUtils.js";
+import { DeleteFromS3, InvalidateCloudFront } from "../../utils/AwsUtils.js";
 
 /**
  * Service: Toggle user status
@@ -27,7 +28,6 @@ export const ToggleUserStatusService = async (userId) => {
 
     // Revoke all sessions of this user
     await ExpireUserSessions(userId);
-
   } else {
     //  If currently INACTIVE, set to ACTIVE (no session revocation needed)
     updatedStatus = UserStatus.Active;
@@ -62,19 +62,17 @@ export const DeleteUserService = async (userId) => {
     throw new ApiError(404, "User not found");
   }
 
-    // / Delete all media assets from S3 & clear CDN
-    if (user.media_assets && user.media_assets.length > 0) {
-      for (const media of user.media_assets) {
-        //elete file from S3
-        await S3Service.DeleteObject(media.s3_key);
+  // / Delete all media assets from S3 & clear CDN
+  if (user.media_assets && user.media_assets.length > 0) {
+    for (const media of user.media_assets) {
+      // delete file from S3
+      await DeleteFromS3(media.s3_key);
 
-        //lear CDN cache for the media URL (if using CloudFront invalidation)
-        await S3Service.InvalidateCdnCache(media.cdn_url);
-      }
+      // Invalidate CloudFront if distribution ID exists
+      await InvalidateCloudFront(media.s3_key);
     }
+  }
 
-    //  Revoke all active sessions
-    await ExpireUserSessions(userId);
 
   // Delete profile (cascade deletion handled via Prisma relation)
   // Delete user
