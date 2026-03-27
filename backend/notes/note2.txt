@@ -1,5 +1,5 @@
 Output ==>
-proper error logs 
+proper error logs ✅
 swagger for api doc ✅
 unit testing
 joi and sanitization
@@ -17,9 +17,10 @@ Understands :-
 
 Todos :-
 
-if one db request fail so permenantly data change or not
-Or we should use transaction on multi db hit functions ✅
+if one db request fail so permenantly data change or not Or we should use transaction on multi db hit functions ✅
 
 frontend
 
 network api 
+
+cron job for old sessions delete 
