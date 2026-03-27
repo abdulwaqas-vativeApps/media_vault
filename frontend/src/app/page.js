@@ -35,7 +35,10 @@ export default function Login() {
     );
 
     const data = await res.json();
-    localStorage.setItem('jwt', data.token);
+    console.log('=============google login response==============');
+    console.log(data);
+    console.log('=============google login response==============');
+    localStorage.setItem('access_token', data.token);
 
     console.log('✅ Logged in');
   };

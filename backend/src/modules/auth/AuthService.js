@@ -145,7 +145,7 @@ export const GoogleAuthService = async ({ idToken, userAgent, ipAddress }) => {
 
         profile: {
           create: {
-            full_name: name || "Google User",
+            full_name: name,
           },
         },
       },
@@ -154,6 +154,8 @@ export const GoogleAuthService = async ({ idToken, userAgent, ipAddress }) => {
         profile: true,
       },
     });
+
+    console.log("✅ New user created via Google Auth: ", user);
   }
 
   if (user && user.status === UserStatus.Inactive) {
@@ -186,6 +188,8 @@ export const GoogleAuthService = async ({ idToken, userAgent, ipAddress }) => {
     role: user.role.name,
     sessionId: session.id,
   });
+
+  console.log("✅ User logged in via Google Auth: ", user);
 
   return {
     user,
