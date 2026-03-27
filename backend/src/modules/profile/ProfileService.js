@@ -55,102 +55,121 @@ export const UpdateProfileService = async ({
   password,
   media_assets,
 }) => {
-  // 1. Check if user exists
-  const existingUser = await prisma.users.findUnique({
-    where: { id: userId },
-    include: { profile: true },
-  });
+  // Store hashed password (if provided)
+  let hashedPassword = null;
 
-  if (!existingUser) {
-    throw new ApiError(404, "User not found");
-  }
+  //  Start Prisma transaction
+  const updatedUser = await prisma.$transaction(
+    async (tx) => {
 
-  // 2. Update password if provided
-  if (existingUser.provider === Provider.Google && !password) {
-    throw new ApiError(400, "Password is required for Google signing users");
-  } else if (existingUser.provider === Provider.Google && password) {
-    const hashedPassword = await bcrypt.hash(password, 10);
-    await prisma.users.update({
+    // --- Step 1: Check if user exists ---
+    const existingUser = await tx.users.findUnique({
       where: { id: userId },
-      data: { password: hashedPassword },
+      include: { profile: true },
     });
-  }
 
-  // 3. Upsert profile
-  await prisma.profiles.upsert({
-    where: { user_id: userId },
-    update: {
-      full_name,
-      designation,
-      contact_number,
-      connect_me_for,
-      company_name,
-    },
-    create: {
-      user_id: userId,
-      full_name,
-      designation,
-      contact_number,
-      connect_me_for,
-      company_name,
-    },
-  });
+    if (!existingUser) {
+      throw new ApiError(404, "User not found");
+    }
 
-  // 4. Handle media assets
-  if (media_assets && media_assets.length > 0) {
-    for (const asset of media_assets) {
-      // Check for existing asset of the same type
-      const existingAsset = await prisma.media_assets.findFirst({
-        where: {
-          user_id: userId,
-          asset_type: asset.asset_type,
-        },
-      });
-      console.log("run yes");
-      if (existingAsset) {
-        console.log("run no");
-        // Delete from S3
-        if (existingAsset.s3_key) {
+    // --- Step 2: Update password if provided ---
+    if (existingUser.provider === Provider.Google && !existingUser.password && !password) {
+      throw new ApiError(400, "Password is required for Google signing users");
+    } else if (existingUser.provider === Provider.Google && !existingUser.password && password) {
+      hashedPassword = await bcrypt.hash(password, 10);
+    }
 
-          // delete file from S3
-          await DeleteFromS3(existingAsset.s3_key);
+    // --- Step 3: Upsert profile ---
+    await tx.profiles.upsert({
+      where: { user_id: userId },
+      update: {
+        full_name,
+        designation,
+        contact_number,
+        connect_me_for,
+        company_name,
+        password: hashedPassword ? hashedPassword : existingUser.password, // Update password if new one provided
+      },
+      create: {
+        user_id: userId,
+        full_name,
+        designation,
+        contact_number,
+        connect_me_for,
+        company_name,
+      },
+    });
 
-          // Invalidate CloudFront if distribution ID exists
-          await InvalidateCloudFront(existingAsset.s3_key);
+    // --- Step 4: Handle media assets (DB part only) ---
+    if (media_assets && media_assets.length > 0) {
+      for (const asset of media_assets) {
+        // Check for existing asset of the same type
+        const existingAsset = await tx.media_assets.findFirst({
+          where: {
+            user_id: userId,
+            asset_type: asset.asset_type,
+          },
+        });
+
+        // If existing asset found, delete from DB (S3 handled later)
+        if (existingAsset) {
+          await tx.media_assets.delete({
+            where: { id: existingAsset.id },
+          });
         }
 
-        // Delete from DB
-        await prisma.media_assets.delete({
-          where: { id: existingAsset.id },
+        // Add new asset
+        await tx.media_assets.create({
+          data: {
+            user_id: userId,
+            asset_type: asset.asset_type,
+            s3_key: asset.s3_key,
+            cdn_url: asset.cdn_url,
+            mime_type: asset.mime_type,
+          },
         });
       }
+    }
 
-      // Add new asset
-      await prisma.media_assets.create({
-        data: {
-          user_id: userId,
-          asset_type: asset.asset_type,
-          s3_key: asset.s3_key,
-          cdn_url: asset.cdn_url,
-          mime_type: asset.mime_type,
-        },
-      });
+    // --- Step 5: Fetch updated user to return ---
+    const user = await tx.users.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        provider: true,
+        status: true,
+        profile: true,
+        media_assets: true,
+        role: true,
+      },
+    });
+
+    return user;
+  });
+
+  // --- Step 6: Handle S3 and CloudFront side-effects outside transaction ---
+  if (media_assets && media_assets.length > 0) {
+    for (const asset of media_assets) {
+      try {
+        // Delete existing files & invalidate CDN
+        const existingAsset = await prisma.media_assets.findFirst({
+          where: {
+            user_id: userId,
+            asset_type: asset.asset_type,
+          },
+        });
+
+        if (existingAsset && existingAsset.s3_key) {
+          await DeleteFromS3(existingAsset.s3_key);
+          await InvalidateCloudFront(existingAsset.s3_key);
+        }
+      } catch (err) {
+        console.error("S3 / CloudFront operation failed:", err);
+        // Logging only — do not break main transaction
+      }
     }
   }
-
-  // Fetch updated user with profile and media assets to return
-  const updatedUser = await prisma.users.findUnique({
-    where: { id: userId },
-    select: {
-      id: true,
-      email: true,
-      provider: true,
-      status: true,
-      profile: true,
-      media_assets: true,
-      role: true,
-    },
-  });
 
   return updatedUser;
 };

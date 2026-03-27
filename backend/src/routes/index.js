@@ -6,6 +6,7 @@ import authRoutes from "../modules/auth/AuthRoutes.js";
 import sessionRoutes from "../modules/session/SessionRoutes.js";
 import profileRoutes from "../modules/profile/ProfileRoutes.js";
 import adminRoutes from "../modules/admin/AdminRoutes.js"; 
+import networkRoutes from "../modules/network/NetworkRoutes.js"; 
 
 const router = Router();
 
@@ -19,5 +20,6 @@ router.use("/auth", authRoutes);
 router.use("/session", sessionRoutes);
 router.use("/profile", profileRoutes);
 router.use("/admin", adminRoutes);
+router.use("/network", networkRoutes);
 
 export default router;

@@ -18,7 +18,7 @@ Understands :-
 Todos :-
 
 if one db request fail so permenantly data change or not
-Or we should use transaction on multi db hit functions
+Or we should use transaction on multi db hit functions ✅
 
 frontend
 

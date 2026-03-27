@@ -10,7 +10,8 @@ export const Provider = {
 
 export const UserStatus = {
   Active: "Active",
-  Inactive: "Inactive"
+  Inactive: "Inactive",
+  All : "All"
 };
 
 export const ImageType = {
