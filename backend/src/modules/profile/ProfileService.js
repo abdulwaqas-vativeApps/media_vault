@@ -5,7 +5,13 @@ import { ApiError } from "../../utils/ApiError.js";
 import { s3, cloudFront } from "../../config/Aws.js";
 import prisma from "../../config/prisma.js";
 import bcrypt from "bcryptjs";
-import { DeleteFromS3, InvalidateCloudFront } from "../../utils/AwsUtils.js";
+import {
+  DeleteFromS3,
+  BulkDeleteFromS3,
+  InvalidateCloudFront,
+  BulkInvalidateCloudFront,
+} from "../../utils/AwsUtils.js";
+import env from "../../config/env.js";
 
 /**
  * Generate presigned URL Service for media assets
@@ -25,8 +31,10 @@ export const PresignedUrlService = async ({
 
   const key = `${uploadFor}/${Date.now()}-${fileName}`;
 
+  console.log("env.S3_BUCKET_NAME ++++++++++++++++++++++++", env.S3_BUCKET_NAME);
+
   const command = new PutObjectCommand({
-    Bucket: process.env.S3_BUCKET_NAME,
+    Bucket: env.S3_BUCKET_NAME,
     Key: key,
     ContentType: fileType,
   });
@@ -38,7 +46,7 @@ export const PresignedUrlService = async ({
   return {
     key,
     uploadUrl,
-    cdnUrl: `${process.env.CDN_URL}/${key}`,
+    cdnUrl: `${env.CDN_URL}/${key}`,
   };
 };
 
@@ -55,13 +63,30 @@ export const UpdateProfileService = async ({
   password,
   media_assets,
 }) => {
-  // Store hashed password (if provided)
-  let hashedPassword = null;
+
+
+  // --- Step 4: Identify media assets to delete from S3 ---
+  const keysToDelete = [];
+  if (media_assets && media_assets.length > 0) {
+    // Fetch existing assets for the user before any changes
+    const existingAssets = await prisma.media_assets.findMany({
+      where: { user_id: userId },
+    });
+
+    for (const newAsset of media_assets) {
+      const oldAsset = existingAssets.find(
+        (a) => a.asset_type === newAsset.asset_type
+      );
+
+      // Only delete if the S3 key has changed (per requirement)
+      if (oldAsset && oldAsset.s3_key !== newAsset.s3_key) {
+        keysToDelete.push(oldAsset.s3_key);
+      }
+    }
+  }
 
   //  Start Prisma transaction
-  const updatedUser = await prisma.$transaction(
-    async (tx) => {
-
+  const updatedUser = await prisma.$transaction(async (tx) => {
     // --- Step 1: Check if user exists ---
     const existingUser = await tx.users.findUnique({
       where: { id: userId },
@@ -73,10 +98,22 @@ export const UpdateProfileService = async ({
     }
 
     // --- Step 2: Update password if provided ---
-    if (existingUser.provider === Provider.Google && !existingUser.password && !password) {
+    if (
+      existingUser.provider === Provider.Google &&
+      !existingUser.password &&
+      !password
+    ) {
       throw new ApiError(400, "Password is required for Google signing users");
-    } else if (existingUser.provider === Provider.Google && !existingUser.password && password) {
-      hashedPassword = await bcrypt.hash(password, 10);
+    } else if (
+      existingUser.provider === Provider.Google &&
+      !existingUser.password &&
+      password
+    ) {
+      const hashedPassword = await bcrypt.hash(password, 10);
+      await tx.users.update({
+        where: { id: userId },
+        data: { password: hashedPassword },
+      });
     }
 
     // --- Step 3: Upsert profile ---
@@ -88,7 +125,6 @@ export const UpdateProfileService = async ({
         contact_number,
         connect_me_for,
         company_name,
-        password: hashedPassword ? hashedPassword : existingUser.password, // Update password if new one provided
       },
       create: {
         user_id: userId,
@@ -100,23 +136,18 @@ export const UpdateProfileService = async ({
       },
     });
 
-    // --- Step 4: Handle media assets (DB part only) ---
+    console.log("user updated ++++++++++++++++++++");
+
+    // --- Step 5: Handle media assets (DB update) ---
     if (media_assets && media_assets.length > 0) {
       for (const asset of media_assets) {
-        // Check for existing asset of the same type
-        const existingAsset = await tx.media_assets.findFirst({
+        // Delete existing asset of the same type from DB
+        await tx.media_assets.deleteMany({
           where: {
             user_id: userId,
             asset_type: asset.asset_type,
           },
         });
-
-        // If existing asset found, delete from DB (S3 handled later)
-        if (existingAsset) {
-          await tx.media_assets.delete({
-            where: { id: existingAsset.id },
-          });
-        }
 
         // Add new asset
         await tx.media_assets.create({
@@ -128,10 +159,12 @@ export const UpdateProfileService = async ({
             mime_type: asset.mime_type,
           },
         });
+
+        console.log("media asset updated in DB ++++++++++++++++++++");
       }
     }
 
-    // --- Step 5: Fetch updated user to return ---
+    // --- Step 6: Fetch updated user to return ---
     const user = await tx.users.findUnique({
       where: { id: userId },
       select: {
@@ -145,29 +178,20 @@ export const UpdateProfileService = async ({
       },
     });
 
+    console.log("user fetched ++++++++++++++++++++");
+
     return user;
   });
 
-  // --- Step 6: Handle S3 and CloudFront side-effects outside transaction ---
-  if (media_assets && media_assets.length > 0) {
-    for (const asset of media_assets) {
-      try {
-        // Delete existing files & invalidate CDN
-        const existingAsset = await prisma.media_assets.findFirst({
-          where: {
-            user_id: userId,
-            asset_type: asset.asset_type,
-          },
-        });
-
-        if (existingAsset && existingAsset.s3_key) {
-          await DeleteFromS3(existingAsset.s3_key);
-          await InvalidateCloudFront(existingAsset.s3_key);
-        }
-      } catch (err) {
-        console.error("S3 / CloudFront operation failed:", err);
-        // Logging only — do not break main transaction
-      }
+  // --- Step 7: Handle S3 and CloudFront side-effects (Bulk) ---
+  if (keysToDelete.length > 0) {
+    try {
+      console.log("Performing bulk cleanup for keys:", keysToDelete);
+      await BulkDeleteFromS3(keysToDelete);
+      await BulkInvalidateCloudFront(keysToDelete);
+    } catch (err) {
+      console.error("Bulk S3 / CloudFront operation failed:", err);
+      // Logging only — do not break the response as DB update was successful
     }
   }
 

@@ -1,4 +1,5 @@
 import express from "express";
+import env from "../../config/env.js";
 import { AuthMiddleware } from "../../middlewares/AuthMiddleware.js";
 import { ValidateSchema } from "../../middlewares/ValidateMiddleware.js";
 import * as ProfileValidation from "./ProfileValidation.js";
@@ -9,16 +10,17 @@ const router = express.Router();
 
 // Conditional upload middleware
 const conditionalUpload = (req, res, next) => {
-  if (process.env.USE_CDN === "false") {
-    return UploadMiddleware.single("image")(req, res, next);
+  if (env.USE_CDN === "false") {
+    const upload = UploadMiddleware.single("image");
+    return upload(req, res, next);
   }
-  // Parse multipart/form-data with memory storage to populate req.body when CDN is used
+  // Parse multipart/form-data with memory storage to populate req.body when CDN is true
   return UploadMemoryMiddleware.single("image")(req, res, next);
 };
 
 // Conditional validation middleware
 const conditionalValidation = (req, res, next) => {
-  if (process.env.USE_CDN !== "false") {
+  if (env.USE_CDN !== "false") {
     return ValidateSchema(ProfileValidation.PresignedUrlSchema)(req, res, next);
   }
   console.log("conditionalValidation done");

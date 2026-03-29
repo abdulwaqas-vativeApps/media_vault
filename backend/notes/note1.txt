@@ -410,27 +410,10 @@ Work we have done yet :
 
 
 
+
+
 ===============================================
 //  prompt 2
-===============================================
-"
-Api : PUT /api/profile
-Goal : Update current user's profile and media assets
-
-
-logic :
-user_id ki base pr session find kr k revoke krna aur validation bhi krna jis jis ki need ho
-jis trhn baki kam hwa wa h usi structure ko follow krty hway ka kam
-jis trhn industry m kam hota h usi trhn kam krna
-
-write joi validation (if needed), route, controller , service for this api"
-convert this prompt into english
-
-
-
-
-===============================================
-//  prompt 3
 ===============================================
 
 DELETE
@@ -469,195 +452,128 @@ jis trhn industry m kam hota h usi trhn kam krna
 //  prompt 4
 ===============================================
 
-m ne is trhn se kam kia h,
-mera folow is trhn se chal rha, isi structure pr sara kam h
-For example:
-
-import Joi from "joi";
-
-/**
- * Validation schema for params: userId
- */
-export const UserStatusSchema = Joi.object({
-  userId: Joi.string().required().messages({
-    "string.empty": "User ID is required",
-    "any.required": "User ID is required"
-  }),
-});
-
-
-
 import express from "express";
-import * as AdminController from "./AdminController.js";
 import { AuthMiddleware } from "../../middlewares/AuthMiddleware.js";
-import { RoleMiddleware } from "../../middlewares/RoleMiddleware.js";
 import { ValidateSchema } from "../../middlewares/ValidateMiddleware.js";
-import * as AdminSchemaValidation from "./AdminValidation.js";
-import { ROLES } from "../../constants/constants.js";
+import * as ProfileValidation from "./ProfileValidation.js";
+import * as ProfileController from "./ProfileController.js";
+import { UploadMiddleware, UploadMemoryMiddleware } from "../../middlewares/UploadMiddleware.js";
 
 const router = express.Router();
 
+// Conditional upload middleware
+const conditionalUpload = (req, res, next) => {
+  if (process.env.USE_CDN === "false") {
+    return UploadMiddleware.single("image")(req, res, next);
+  }
+  // Parse multipart/form-data with memory storage to populate req.body when CDN is true
+  return UploadMemoryMiddleware.single("image")(req, res, next);
+};
+
+// Conditional validation middleware
+const conditionalValidation = (req, res, next) => {
+  if (process.env.USE_CDN !== "false") {
+    return ValidateSchema(ProfileValidation.PresignedUrlSchema)(req, res, next);
+  }
+  console.log("conditionalValidation done");
+  next();
+};
+
 /**
- * @route   PATCH /api/admin/users/:userId/deactivate
- * @desc    Toggle user status (ACTIVE <-> INACTIVE)
- *          If setting to INACTIVE, revoke all sessions of the user
- * @access  Admin only
+ * Get Presigned URL for media assets
  */
-router.patch(
-  "/users/:userId/deactivate",
+router.post(
+  "/media-assets/presigned-url",
   AuthMiddleware,
-  RoleMiddleware(ROLES.Admin),
-  ValidateSchema(AdminSchemaValidation.UserStatusSchema, "params"), // validate userId param
-  AdminController.ToggleUserStatusController,
+  conditionalUpload,
+  conditionalValidation,
+  ProfileController.PresignedUrlController
 );
 
 /**
- * @route   DELETE /api/admin/users/:userId
- * @desc    Permanently delete a user and all associated data
- * @access  Admin only
+ * Get My Profile
  */
-router.delete(
-  "/users/:userId",
-  AuthMiddleware,
-  RoleMiddleware(ROLES.Admin),
-  ValidateSchema(AdminSchemaValidation.UserStatusSchema, "params"), // validate userId param
-  AdminController.DeleteUserController,
-);
+router.get("/me", AuthMiddleware, ProfileController.GetMyProfileController);
+
 export default router;
 
 
 
-import * as AdminService from "./AdminService.js";
-import { SendResponse } from "../../utils/ApiResponse.js";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
 
-/**
- * Controller: Toggle user status (ACTIVE <-> INACTIVE)
- * Only Admin can perform this action
- * 
- * @param req.params.userId - Target user ID
- * @returns Updated user status
- */
-export const ToggleUserStatusController = async (req, res, next) => {
-  try {
-    const { userId } = req.params;
+// Ensure uploads directory exists
+const uploadDir = path.join(process.cwd(), "uploads");
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
 
-    // Call service to toggle user status
-    const updatedUser = await AdminService.ToggleUserStatusService(userId);
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(null, `${uniqueSuffix}${ext}`);
+  },
+});
 
-    return SendResponse(res, 200, "User status updated successfully", updatedUser);
-  } catch (error) {
-    next(error); // Pass to global error handler
+const fileFilter = (req, file, cb) => {
+  // Accept images only
+  if (!file.originalname.match(/\.(jpg|jpeg|png|gif|webp)$/i)) {
+    return cb(new Error("Only image files are allowed!"), false);
   }
+  cb(null, true);
+};
+
+export const UploadMiddleware = multer({
+  storage,
+  fileFilter,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+});
+
+const memoryStorage = multer.memoryStorage();
+
+export const UploadMemoryMiddleware = multer({
+  storage: memoryStorage,
+  fileFilter,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+});
+
+
+
+
+kindly explain this code to me, i am confuse in this part 
+// Conditional upload middleware
+const conditionalUpload = (req, res, next) => {
+  if (process.env.USE_CDN === "false") {
+    return UploadMiddleware.single("image")(req, res, next);
+  }
+  // Parse multipart/form-data with memory storage to populate req.body when CDN is true
+  return UploadMemoryMiddleware.single("image")(req, res, next);
+};
+
+// Conditional validation middleware
+const conditionalValidation = (req, res, next) => {
+  if (process.env.USE_CDN !== "false") {
+    return ValidateSchema(ProfileValidation.PresignedUrlSchema)(req, res, next);
+  }
+  console.log("conditionalValidation done");
+  next();
+  
 };
 
 /**
- * Controller: Permanently delete a user
- * - Removes user from DB
- * - Deletes profile
- * - Revokes all sessions
- * - Deletes media assets from S3 & clears CDN cache
+ * Get Presigned URL for media assets
  */
-export const DeleteUserController = async (req, res, next) => {
-  try {
-    const { userId } = req.params;
+router.post(
+  "/media-assets/presigned-url",
+  AuthMiddleware,
+  conditionalUpload,
+  conditionalValidation,
+  ProfileController.PresignedUrlController
+);
 
-    // Call service to handle full deletion
-    await AdminService.DeleteUserService(userId);
-
-    return SendResponse(res, 200, "User deleted successfully");
-  } catch (error) {
-    next(error);
-  }
-};
-
-
-
-import prisma from "../../config/prisma.js";
-import { ApiError } from "../../utils/ApiError.js";
-import { UserStatus } from "../../constants/constants.js";
-import { ExpireUserSessions } from "../../utils/SessionUtils.js";
-import { DeleteFromS3, InvalidateCloudFront } from "../../utils/AwsUtils.js";
-
-/**
- * Service: Toggle user status
- */
-export const ToggleUserStatusService = async (userId) => {
-  // Fetch current user status
-  const user = await prisma.users.findUnique({ where: { id: userId } });
-
-  if (!user) {
-    throw new ApiError(404, "User not found");
-  }
-
-  let updatedStatus;
-
-  if (user.status === UserStatus.Active) {
-    //  If currently ACTIVE, set to INACTIVE and revoke all sessions
-    updatedStatus = UserStatus.Inactive;
-
-    await prisma.users.update({
-      where: { id: userId },
-      data: { status: updatedStatus },
-    });
-
-    // Revoke all sessions of this user
-    await ExpireUserSessions(userId);
-  } else {
-    //  If currently INACTIVE, set to ACTIVE (no session revocation needed)
-    updatedStatus = UserStatus.Active;
-
-    await prisma.users.update({
-      where: { id: userId },
-      data: { status: updatedStatus },
-    });
-  }
-
-  //  Return updated status
-  return { userId, status: updatedStatus };
-};
-
-/**
- * Service: Delete a user permanently
- * - Delete all media assets from S3 and clear CDN
- * - Delete profile
- * - Delete sessions
- * - Delete user
- *
- * @param {string} userId
- */
-export const DeleteUserService = async (userId) => {
-  // / Fetch user to ensure existence
-  const user = await prisma.users.findUnique({
-    where: { id: userId },
-    include: { media_assets: true },
-  });
-
-  if (!user) {
-    throw new ApiError(404, "User not found");
-  }
-
-  // / Delete all media assets from S3 & clear CDN
-  if (user.media_assets && user.media_assets.length > 0) {
-    for (const media of user.media_assets) {
-      // delete file from S3
-      await DeleteFromS3(media.s3_key);
-
-      // Invalidate CloudFront if distribution ID exists
-      await InvalidateCloudFront(media.s3_key);
-    }
-  }
-
-
-  // Delete profile (cascade deletion handled via Prisma relation)
-  // Delete user
-  await prisma.users.delete({
-    where: { id: userId },
-  });
-
-  return;
-};
-
-
-
-
-m ne backend almost complete kr lia h, bus thora sa kam rehta h
+and also why we write (req, res, next); this after return function above

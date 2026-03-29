@@ -5,6 +5,7 @@ import { generateAccessToken, generateRefreshToken } from "../../utils/jwt.js";
 import { OAuth2Client } from "google-auth-library";
 import { Provider, ROLES, UserStatus } from "../../constants/constants.js";
 import jwt from "jsonwebtoken";
+import env from "../../config/env.js";
 
 /**
  * Handles user signup logic
@@ -30,7 +31,7 @@ export const SignupService = async ({
 
   // Get default role (Member)
   const role = await prisma.roles.findUnique({
-    where: { name: ROLES.Admin },
+    where: { name: ROLES.Member },
   });
 
   if (!role) {
@@ -98,12 +99,12 @@ export const SignupService = async ({
  * Handles Google authentication logic
  */
 export const GoogleAuthService = async ({ idToken, userAgent, ipAddress }) => {
-  const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+  const googleClient = new OAuth2Client(env.GOOGLE_CLIENT_ID);
 
   // Verify google token
   const ticket = await googleClient.verifyIdToken({
     idToken,
-    audience: process.env.GOOGLE_CLIENT_ID,
+    audience: env.GOOGLE_CLIENT_ID,
   });
 
   const payload = ticket.getPayload();

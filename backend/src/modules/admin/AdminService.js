@@ -2,7 +2,12 @@ import prisma from "../../config/prisma.js";
 import { ApiError } from "../../utils/ApiError.js";
 import { UserStatus } from "../../constants/constants.js";
 import { ExpireUserSessions } from "../../utils/SessionUtils.js";
-import { DeleteFromS3, InvalidateCloudFront } from "../../utils/AwsUtils.js";
+import {
+  DeleteFromS3,
+  BulkDeleteFromS3,
+  InvalidateCloudFront,
+  BulkInvalidateCloudFront,
+} from "../../utils/AwsUtils.js";
 import logger from "../../config/logger.js";
 
 /**
@@ -81,14 +86,15 @@ export const DeleteUserService = async (userId) => {
   userId,
 });
 
-  // / Delete all media assets from S3 & clear CDN
+  // --- Step 3: Delete all media assets from S3 & clear CDN (Bulk) ---
   if (user.media_assets && user.media_assets.length > 0) {
-    await Promise.all(
-      user.media_assets.map(async (media) => {
-        await DeleteFromS3(media.s3_key);
-        await InvalidateCloudFront(media.s3_key);
-      }),
-    );
+    const s3Keys = user.media_assets.map((media) => media.s3_key);
+    try {
+      await BulkDeleteFromS3(s3Keys);
+      await BulkInvalidateCloudFront(s3Keys);
+    } catch (err) {
+      logger.error("Failed to delete user media assets in bulk:", err);
+    }
   }
 
   return;

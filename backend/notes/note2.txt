@@ -9,18 +9,9 @@ code speed
 code readibilty improve
 
 
-Understands :-
-
-1.In profile route presigned conditional logic 
-2.cahe invalid cdn, s3 delete understand and also fix chahe invalid cdn
-
-
 Todos :-
 
-if one db request fail so permenantly data change or not Or we should use transaction on multi db hit functions ✅
-
 frontend
-
-network api 
-
 cron job for old sessions delete 
+add taiwlind in inertia_ui_demo
+think about Eng
