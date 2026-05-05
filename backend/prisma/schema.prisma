@@ -42,7 +42,7 @@ model users {
   provider auth_provider
   status   user_status   @default(Active)
   role_id  String
-
+  isProfileCompleted Boolean @default(false)
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 

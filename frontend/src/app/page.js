@@ -1,23 +1,21 @@
+"use client";
 
-'use client';
-
-import { useEffect } from 'react';
+import { useEffect } from "react";
 
 export default function Login() {
-
   // for attach google sign in button to div#googleBtn, we need to wait for google script to load
-  useEffect(() => { 
+  useEffect(() => {
     /* global google */
     if (window.google) {
       google.accounts.id.initialize({
         client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
-        callback: handleGoogleResponse
+        callback: handleGoogleResponse,
       });
 
-      google.accounts.id.renderButton(
-        document.getElementById('googleBtn'),
-        { theme: 'outline', size: 'large' }
-      );
+      google.accounts.id.renderButton(document.getElementById("googleBtn"), {
+        theme: "outline",
+        size: "large",
+      });
     }
   }, []);
 
@@ -28,19 +26,20 @@ export default function Login() {
     const res = await fetch(
       `${process.env.NEXT_PUBLIC_BACKEND_URL}/auth/google`,
       {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idToken })
-      }
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idToken }),
+        credentials: "include",
+      },
     );
 
     const data = await res.json();
-    console.log('=============google login response==============');
+    console.log("=============google login response==============");
     console.log(data);
-    console.log('=============google login response==============');
-    localStorage.setItem('access_token', data.token);
+    console.log("=============google login response==============");
+    localStorage.setItem("access_token", data.token);
 
-    console.log('✅ Logged in');
+    console.log("✅ Logged in");
   };
 
   // IMAGE SELECT → PRESIGNED URL → PUT TO S3
@@ -49,72 +48,64 @@ export default function Login() {
     if (!file) return;
 
     try {
-      //  Presigned URL backend se lo
+      //  FormData = form ke fields (text + files) ko key-value pairs ki form me backend ko bhejne ka tareeqa.
       const formData = new FormData();
       formData.append("image", file); // 👈 IMPORTANT
       formData.append("mime_type", file.type);
       formData.append("file_name", file.name);
-      formData.append("asset_type", "Profile_Picture");
+      formData.append("asset_type", "Company_Logo");
 
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_BACKEND_URL}/profile/media-assets/presigned-url`,
         {
           method: "POST",
-          body: formData, 
-        }
+          body: formData,
+        },
       );
+      // Browser automatically request header set karta hai: Content-Type: multipart/form-data
 
       const data = await res.json();
 
-      console.log('=============upload url==============');
+      console.log("=============upload url==============");
       console.log(data);
       console.log(file);
-      console.log('=============upload url==============');
+      console.log("=============upload url==============");
 
       //  PUT request → DIRECT S3
       if (data.data.uploadUrl) {
         await fetch(data.data.uploadUrl, {
           method: "PUT",
           headers: {
-            "Content-Type": file.type
+            "Content-Type": file.type,
           },
-          body: file
+          body: file,
         });
       }
 
       console.log(" Image uploaded to S3");
 
-
       // (STEP-3 baad mein: backend ko key/url save karwao)
-
     } catch (err) {
       console.error(" Upload failed", err);
     }
   };
 
   return (
-    <div style={{ marginTop: '100px', textAlign: 'center' }}>
-      <h1 className='text-3xl font-bold underline'>Media Vault 2.O</h1>
+    <div style={{ marginTop: "100px", textAlign: "center" }}>
+      <h1 className="text-3xl font-bold underline">Media Vault 2.O</h1>
       <h1>Login</h1>
 
       {/* Google Button */}
       <div id="googleBtn"></div>
 
-      <br /><br />
+      <br />
+      <br />
 
       {/* Image Upload */}
-      <input
-        type="file"
-        accept="image/*"
-        onChange={handleImageSelect}
-      />
+      <input type="file" accept="image/*" onChange={handleImageSelect} />
 
       {/* Google Script */}
-      <script
-        src="https://accounts.google.com/gsi/client"
-        async
-        defer
-      ></script>
+      <script src="https://accounts.google.com/gsi/client" async defer></script>
     </div>
   );
 }

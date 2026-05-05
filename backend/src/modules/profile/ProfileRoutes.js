@@ -4,7 +4,10 @@ import { AuthMiddleware } from "../../middlewares/AuthMiddleware.js";
 import { ValidateSchema } from "../../middlewares/ValidateMiddleware.js";
 import * as ProfileValidation from "./ProfileValidation.js";
 import * as ProfileController from "./ProfileController.js";
-import { UploadMiddleware, UploadMemoryMiddleware } from "../../middlewares/UploadMiddleware.js";
+import {
+  UploadMiddleware,
+  UploadMemoryMiddleware,
+} from "../../middlewares/UploadMiddleware.js";
 
 const router = express.Router();
 
@@ -12,6 +15,7 @@ const router = express.Router();
 const conditionalUpload = (req, res, next) => {
   if (env.USE_CDN === "false") {
     const upload = UploadMiddleware.single("image");
+    // call manually middlware inside middlware, if return next() move forward, if error so stop and return error
     return upload(req, res, next);
   }
   // Parse multipart/form-data with memory storage to populate req.body when CDN is true
@@ -28,16 +32,6 @@ const conditionalValidation = (req, res, next) => {
 };
 
 /**
- * Update User Profile
- */
-router.put(
-  "/",
-  AuthMiddleware,
-  ValidateSchema(ProfileValidation.UpdateProfileSchema),
-  ProfileController.UpdateProfileController
-);
-
-/**
  * Get Presigned URL for media assets
  */
 router.post(
@@ -45,7 +39,17 @@ router.post(
   // AuthMiddleware,
   conditionalUpload,
   conditionalValidation,
-  ProfileController.PresignedUrlController
+  ProfileController.PresignedUrlController,
+);
+
+/**
+ * Update User Profile
+ */
+router.put(
+  "/",
+  AuthMiddleware,
+  ValidateSchema(ProfileValidation.UpdateProfileSchema),
+  ProfileController.UpdateProfileController,
 );
 
 /**

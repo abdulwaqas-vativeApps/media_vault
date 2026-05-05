@@ -1,17 +1,21 @@
 Output ==>
 proper error logs ✅
 swagger for api doc ✅
-unit testing
+s3,cdn ✅
 joi and sanitization
 rate limitig
+unit testing
 deployement on ec2
 code speed
 code readibilty improve
+
+Use rtk or redux
+Debounce search
+Bottom scroll api call
+Hooks
 
 
 Todos :-
 
 frontend
-cron job for old sessions delete 
-add taiwlind in inertia_ui_demo
-think about Eng
+cron job for old sessions delete

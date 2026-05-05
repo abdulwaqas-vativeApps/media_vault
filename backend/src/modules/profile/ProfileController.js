@@ -51,8 +51,6 @@ export const PresignedUrlController = async (req, res, next) => {
  */
 export const UpdateProfileController = async (req, res, next) => {
   try {
-
-
     const {
       full_name,
       designation,

@@ -16,7 +16,7 @@ const logger = winston.createLogger({
     /**
      * Console log (for development)
      */
-    new winston.transports.Console(),
+    // new winston.transports.Console(),
 
     /**
      * Save only errors in file

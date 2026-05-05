@@ -295,7 +295,6 @@ media-vault-backend/
 │   │   ├── ApiError.js
 │   │   ├── ApiResponse.js
 │   │   ├── jwt.js
-│   │   ├── bcrypt.js
 │   │   
 │   │
 │   ├── routes/
@@ -577,3 +576,23 @@ router.post(
 );
 
 and also why we write (req, res, next); this after return function above
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

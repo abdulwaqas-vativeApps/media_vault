@@ -31,7 +31,10 @@ export const PresignedUrlService = async ({
 
   const key = `${uploadFor}/${Date.now()}-${fileName}`;
 
-  console.log("env.S3_BUCKET_NAME ++++++++++++++++++++++++", env.S3_BUCKET_NAME);
+  console.log(
+    "env.S3_BUCKET_NAME ++++++++++++++++++++++++",
+    env.S3_BUCKET_NAME,
+  );
 
   const command = new PutObjectCommand({
     Bucket: env.S3_BUCKET_NAME,
@@ -63,8 +66,6 @@ export const UpdateProfileService = async ({
   password,
   media_assets,
 }) => {
-
-
   // --- Step 4: Identify media assets to delete from S3 ---
   const keysToDelete = [];
   if (media_assets && media_assets.length > 0) {
@@ -75,7 +76,7 @@ export const UpdateProfileService = async ({
 
     for (const newAsset of media_assets) {
       const oldAsset = existingAssets.find(
-        (a) => a.asset_type === newAsset.asset_type
+        (a) => a.asset_type === newAsset.asset_type,
       );
 
       // Only delete if the S3 key has changed (per requirement)
@@ -113,6 +114,13 @@ export const UpdateProfileService = async ({
       await tx.users.update({
         where: { id: userId },
         data: { password: hashedPassword },
+      });
+    }
+
+    if (!existingUser.isProfileCompleted) {
+      await tx.users.update({
+        where: { id: userId },
+        data: { isProfileCompleted: true },
       });
     }
 
@@ -172,6 +180,7 @@ export const UpdateProfileService = async ({
         email: true,
         provider: true,
         status: true,
+        isProfileCompleted: true,
         profile: true,
         media_assets: true,
         role: true,
@@ -214,6 +223,7 @@ export const GetMyProfileService = async (userId) => {
         email: true,
         provider: true,
         status: true,
+        isProfileCompleted: true,
         profile: true,
         media_assets: true,
         role: true,

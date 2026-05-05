@@ -8,7 +8,7 @@ export const AuthMiddleware = (req, res, next) => {
   const token = req.headers.authorization?.split(" ")[1];
 
   if (!token) {
-    next(new ApiError(401, "Unauthorized: No token provided"));
+    throw new ApiError(401, "Unauthorized: No token provided");
   }
 
   try {
@@ -18,5 +18,5 @@ export const AuthMiddleware = (req, res, next) => {
     next();
   } catch (error) {
     next(new ApiError(401, error.message || "Unauthorized: Invalid token"));
-  }
+  } 
 };
